@@ -432,7 +432,7 @@ export function Camera() {
       if (!res.ok) {
         setTicketStatus('error')
         if (res.status === 401) {
-          setTicketMessage('セッション期限が切れました。再ログインしてください。')
+          setTicketMessage('認証に失敗しました。ログアウトして再ログインすれば正常に戻ります。')
           setSession(null)
         } else {
           setTicketMessage(data?.error || 'コイン残高の取得に失敗しました。')
