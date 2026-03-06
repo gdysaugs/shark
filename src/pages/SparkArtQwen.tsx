@@ -12,6 +12,34 @@ const CFG_STEP = 0.1
 const PROMPT_MAX_LENGTH = 1000
 const PROMPT_PLACEHOLDER = '例: 女が両手で胸を揉む'
 type GenerationMode = 'i2v' | 'qwen_edit'
+type MultiAngleOption = {
+  key: string
+  label: string
+  prompt: string
+}
+
+const MULTIANGLE_AZIMUTH_OPTIONS: readonly MultiAngleOption[] = [
+  { key: 'front', label: '前 (0°)', prompt: 'front view' },
+  { key: 'front_right', label: '右前 (45°)', prompt: 'front-right quarter view' },
+  { key: 'right', label: '右 (90°)', prompt: 'right side view' },
+  { key: 'back_right', label: '右後 (135°)', prompt: 'back-right quarter view' },
+  { key: 'back', label: '後 (180°)', prompt: 'back view' },
+  { key: 'back_left', label: '左後 (225°)', prompt: 'back-left quarter view' },
+  { key: 'left', label: '左 (270°)', prompt: 'left side view' },
+  { key: 'front_left', label: '左前 (315°)', prompt: 'front-left quarter view' },
+] as const
+const MULTIANGLE_ELEVATION_OPTIONS: readonly MultiAngleOption[] = [
+  { key: 'low', label: '下から (-30°)', prompt: 'low-angle shot' },
+  { key: 'eye', label: '目線 (0°)', prompt: 'eye-level shot' },
+  { key: 'elevated', label: 'やや上 (+30°)', prompt: 'elevated shot' },
+  { key: 'high', label: '高い位置 (+60°)', prompt: 'high-angle shot' },
+] as const
+
+const MULTIANGLE_DISTANCE_OPTIONS: readonly MultiAngleOption[] = [
+  { key: 'close', label: '寄り', prompt: 'close-up' },
+  { key: 'medium', label: '中距離', prompt: 'medium shot' },
+  { key: 'wide', label: '引き', prompt: 'wide shot' },
+] as const
 
 type SparkArtQwenProps = {
   generationMode: GenerationMode
@@ -267,6 +295,10 @@ export function SparkArtQwen({
   )
   const [prompt, setPrompt] = useState('')
   const [negativePrompt, setNegativePrompt] = useState('')
+  const [multiAngleEnabled, setMultiAngleEnabled] = useState(false)
+  const [azimuthKey, setAzimuthKey] = useState(MULTIANGLE_AZIMUTH_OPTIONS[0]?.key ?? 'front')
+  const [elevationKey, setElevationKey] = useState(MULTIANGLE_ELEVATION_OPTIONS[1]?.key ?? 'eye')
+  const [distanceKey, setDistanceKey] = useState(MULTIANGLE_DISTANCE_OPTIONS[1]?.key ?? 'medium')
   const [cfg, setCfg] = useState(DEFAULT_CFG)
   const [width, setWidth] = useState(DEFAULT_DIMENSION)
   const [height, setHeight] = useState(DEFAULT_DIMENSION)
@@ -276,9 +308,26 @@ export function SparkArtQwen({
   const [resultImage, setResultImage] = useState('')
 
   const hasBaseImage = Boolean(sourceData)
+  const hasPrompt = prompt.trim().length > 0
   const canGenerate = useMemo(
-    () => hasBaseImage && prompt.trim().length > 0 && !isRunning,
-    [hasBaseImage, prompt, isRunning],
+    () => hasBaseImage && (hasPrompt || multiAngleEnabled) && !isRunning,
+    [hasBaseImage, hasPrompt, multiAngleEnabled, isRunning],
+  )
+  const selectedAzimuth = useMemo(
+    () => MULTIANGLE_AZIMUTH_OPTIONS.find((option) => option.key === azimuthKey) ?? MULTIANGLE_AZIMUTH_OPTIONS[0],
+    [azimuthKey],
+  )
+  const selectedElevation = useMemo(
+    () => MULTIANGLE_ELEVATION_OPTIONS.find((option) => option.key === elevationKey) ?? MULTIANGLE_ELEVATION_OPTIONS[1],
+    [elevationKey],
+  )
+  const selectedDistance = useMemo(
+    () => MULTIANGLE_DISTANCE_OPTIONS.find((option) => option.key === distanceKey) ?? MULTIANGLE_DISTANCE_OPTIONS[1],
+    [distanceKey],
+  )
+  const multiAngleTag = useMemo(
+    () => `<sks> ${selectedAzimuth.prompt} ${selectedElevation.prompt} ${selectedDistance.prompt}`,
+    [selectedAzimuth, selectedElevation, selectedDistance],
   )
 
   const handleSourceChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -418,13 +467,21 @@ export function SparkArtQwen({
       if (!refImages.length && sourceBase64) {
         refImages.push(sourceBase64)
       }
+      const promptText = prompt.trim()
+      const hasSksToken = /<sks>/i.test(promptText)
+      const finalPrompt =
+        multiAngleEnabled && !hasSksToken ? [multiAngleTag, promptText].filter(Boolean).join('\n') : promptText
       const body = {
         input: {
           variant: 'qwen_edit',
           worker_mode: 'comfyui',
           mode: 'comfyui',
-          prompt,
+          prompt: finalPrompt,
           negative_prompt: negativePrompt,
+          multiangle_enabled: multiAngleEnabled,
+          multiangle_azimuth: selectedAzimuth.prompt,
+          multiangle_elevation: selectedElevation.prompt,
+          multiangle_distance: selectedDistance.prompt,
           image_base64: primaryImage,
           reference_images: refImages,
           width: Number(width),
@@ -522,7 +579,7 @@ export function SparkArtQwen({
       <section className='studio-block studio-block--input sa-form-card'>
         <header className='studio-head studio-head--with-mode sa-editor-head'>
           <div className='studio-head__copy'>
-            <h2>編集</h2>
+            <h1>Edit</h1>
             <p>ベース画像は必須です。参考画像は任意です。</p>
           </div>
           <div className='studio-mode-switch studio-mode-switch--inline' aria-label='Generation mode switch'>
@@ -633,6 +690,85 @@ export function SparkArtQwen({
           />
           <small className='sa-input-meta'>{`${prompt.length}/${PROMPT_MAX_LENGTH}`}</small>
         </label>
+
+        <section className='sa-multiangle'>
+          <div className='studio-engine'>
+            <span className='studio-engine__label'>MultiAngle</span>
+            <label className='studio-switch'>
+              <input
+                type='checkbox'
+                checked={multiAngleEnabled}
+                onChange={(event) => setMultiAngleEnabled(event.target.checked)}
+                disabled={isRunning}
+              />
+              <span className='studio-switch__track' aria-hidden='true' />
+              <strong>{multiAngleEnabled ? 'ON' : 'OFF'}</strong>
+            </label>
+          </div>
+
+          {multiAngleEnabled ? (
+            <>
+              <div className='sa-angle-group'>
+                <span>水平方向（前後左右・45°刻み）</span>
+                <select
+                  className='sa-angle-select'
+                  value={azimuthKey}
+                  onChange={(event) => setAzimuthKey(event.target.value)}
+                  disabled={isRunning}
+                  aria-label='水平方向'
+                >
+                  {MULTIANGLE_AZIMUTH_OPTIONS.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className='sa-angle-group'>
+                <span>上下方向（-30° / 0° / +30° / +60°）</span>
+                <select
+                  className='sa-angle-select'
+                  value={elevationKey}
+                  onChange={(event) => setElevationKey(event.target.value)}
+                  disabled={isRunning}
+                  aria-label='上下方向'
+                >
+                  {MULTIANGLE_ELEVATION_OPTIONS.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className='sa-angle-group'>
+                <span>距離感</span>
+                <select
+                  className='sa-angle-select'
+                  value={distanceKey}
+                  onChange={(event) => setDistanceKey(event.target.value)}
+                  disabled={isRunning}
+                  aria-label='距離感'
+                >
+                  {MULTIANGLE_DISTANCE_OPTIONS.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className='sa-angle-preview'>
+                <strong>自動追加タグ</strong>
+                <code>{multiAngleTag}</code>
+                <small>生成時にこのタグをプロンプト先頭へ自動追加します。</small>
+              </div>
+            </>
+          ) : (
+            <small className='sa-input-meta'>OFF時は通常のEdit生成になります。</small>
+          )}
+        </section>
 
         <label className='studio-field studio-field--sub'>
           <span>ネガティブプロンプト</span>

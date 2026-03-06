@@ -13,7 +13,7 @@ type Env = {
 }
 
 const corsMethods = 'POST, GET, OPTIONS'
-const DEFAULT_QWEN_EDIT_ENDPOINT = 'https://api.runpod.ai/v2/278qoim6xsktcb'
+const DEFAULT_QWEN_EDIT_ENDPOINT = 'https://api.runpod.ai/v2/h7p0hwtyzvndp5'
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const MAX_PROMPT_LENGTH = 1000
 const MIN_DIMENSION = 256
@@ -34,7 +34,12 @@ const normalizeEndpoint = (value?: string) => {
   try {
     const parsed = new URL(normalized)
     if (!/^https?:$/.test(parsed.protocol)) return ''
-    return normalized
+    const segments = parsed.pathname.split('/').filter(Boolean)
+    if (segments.length >= 2 && segments[0].toLowerCase() === 'v2') {
+      return `${parsed.origin}/v2/${segments[1]}`
+    }
+    const cleanedPath = parsed.pathname.replace(/\/+$/, '').replace(/\/run(?:sync)?$/i, '')
+    return `${parsed.origin}${cleanedPath}`
   } catch {
     return ''
   }
@@ -434,6 +439,16 @@ const isOomError = (value: unknown) => {
   )
 }
 
+const isMissingMultiAngleLoraError = (payload: unknown) => {
+  const text = JSON.stringify(payload ?? '').toLowerCase()
+  return (
+    text.includes('prompt_outputs_failed_validation') &&
+    text.includes('lora_name') &&
+    text.includes('qwen-image-edit-2511-multiple-angles-lora.safetensors') &&
+    text.includes('not in []')
+  )
+}
+
 const isFailureStatus = (status: unknown) => {
   const normalized = String(status || '').toLowerCase()
   return normalized.includes('fail') || normalized.includes('error') || normalized.includes('cancel')
@@ -559,9 +574,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
 
     const input = (payload.input ?? payload) as Record<string, unknown>
+    const multiAngleEnabled = Boolean(input.multiangle_enabled ?? input.multiangle ?? false)
     const prompt = String(input.prompt ?? input.text ?? '')
     const negativePrompt = String(input.negative_prompt ?? input.negative ?? '')
-    if (!prompt || prompt.length > MAX_PROMPT_LENGTH) {
+    const promptIsEmpty = prompt.trim().length === 0
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      return jsonResponse({ error: `prompt is too long (max ${MAX_PROMPT_LENGTH}).` }, 400, corsHeaders)
+    }
+    if (promptIsEmpty && !multiAngleEnabled) {
       return jsonResponse({ error: `prompt is required (max ${MAX_PROMPT_LENGTH}).` }, 400, corsHeaders)
     }
     if (negativePrompt.length > MAX_PROMPT_LENGTH) {
@@ -633,6 +653,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       setNodeInput(workflow, '9', 'height', height)
       setNodeInput(workflow, '7', 'image', 'input.png')
       setNodeInput(workflow, '8', 'image', 'sub.png')
+      if (workflow['10']?.inputs && multiAngleEnabled) {
+        setNodeInput(workflow, '10', 'strength_model', 1)
+        setNodeInput(workflow, '2', 'model', ['10', 0])
+      } else {
+        if (workflow['10']) {
+          delete workflow['10']
+        }
+        setNodeInput(workflow, '2', 'model', ['1', 0])
+      }
     } catch (error) {
       return jsonResponse(
         {
@@ -675,6 +704,19 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return new Response(raw, { status: upstream.status, headers })
     }
 
+    if (multiAngleEnabled && isMissingMultiAngleLoraError(parsed)) {
+      return jsonResponse(
+        {
+          error: 'MultiAngle LoRA is enabled but not available on the worker.',
+          detail:
+            "qwen-image-edit-2511-multiple-angles-lora.safetensors not found in ComfyUI loras list.",
+          hint: 'Check RunPod worker image/volume so /comfyui/models/loras contains the LoRA.',
+        },
+        503,
+        corsHeaders,
+      )
+    }
+
     const upstreamError = pickErrorMessage(parsed)
     if (isOomError(upstreamError)) {
       return jsonResponse(
@@ -700,6 +742,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         height,
         steps,
         cfg: Number.isFinite(cfg) ? cfg : 1,
+        multiangle_enabled: multiAngleEnabled,
         job_id: jobId ?? null,
         status: upstreamStatus || null,
         source: 'run',

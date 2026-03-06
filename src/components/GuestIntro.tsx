@@ -36,8 +36,8 @@ const ENGINE_FEATURES = [
     description: 'プロンプトに忠実で、破綻が少ない安定した生成。まずはこちらがおすすめです。',
   },
   {
-    name: 'NeoSpark',
-    description: '大胆で予想外の動きが出やすいエンジン。表現の幅が広い一方で、破綻は増えやすくなります。',
+    name: 'NeoSpark V9',
+    description: 'DaSiWa Lightspeed High/Low (V9) ベース。大胆で予想外の動きが出やすく、表現の幅が広い一方で、破綻は増えやすくなります。',
   },
 ]
 
@@ -191,7 +191,7 @@ export function GuestIntro({ mode: _mode, onSignIn, onEmailLogin }: GuestIntroPr
       <section className='pulse-faq'>
         <div className='pulse-faq__head'>
           <h2>SparkMotionでできること</h2>
-          <p>Spark / NeoSpark の2つの動画生成エンジンを用途に合わせて使い分けできます。</p>
+          <p>Spark / NeoSpark V9 の2つの動画スタイルを用途に合わせて使い分けできます。</p>
         </div>
         <div className='pulse-faq__grid'>
           {ENGINE_FEATURES.map((item) => (

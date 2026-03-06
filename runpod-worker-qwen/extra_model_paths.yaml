@@ -1,0 +1,3 @@
+embedded:
+  base_path: /opt/embedded-models
+  loras: loras

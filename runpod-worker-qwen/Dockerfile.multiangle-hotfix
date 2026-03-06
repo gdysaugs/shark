@@ -1,0 +1,8 @@
+FROM suarez123/qwen-multiangle:rapid-aio-v23-nsfw-clean
+
+RUN mkdir -p /comfyui/models/loras /opt/embedded-models/loras
+COPY models/loras/qwen-image-edit-2511-multiple-angles-lora.safetensors /comfyui/models/loras/
+COPY models/loras/qwen-image-edit-2511-multiple-angles-lora.safetensors /opt/embedded-models/loras/
+COPY extra_model_paths.yaml /opt/embedded-models/extra_model_paths.yaml
+COPY start.sh /start.sh
+RUN sed -i 's/\r$//' /start.sh && chmod +x /start.sh

@@ -8,22 +8,28 @@ const parseUrl = (value: string) => {
   }
 }
 
-const sameOrigin = (a: string, b: string) => {
-  const left = parseUrl(a)
-  const right = parseUrl(b)
-  if (!left || !right) return false
-  return left.origin === right.origin
-}
+const toRedirectLocation = (url: URL) => `${url.origin}${url.pathname}`
+const isBlockedHost = (hostname: string) => hostname.toLowerCase().includes('sparkwork')
 
 export const getOAuthRedirectUrl = () => {
-  const currentUrl =
-    typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined
+  if (typeof window === 'undefined') return undefined
+
+  const current = parseUrl(window.location.href)
+  if (!current) return undefined
+  const currentUrl = toRedirectLocation(current)
+
+  if (isBlockedHost(current.hostname)) return currentUrl
+
   const runtimeConfig = getRuntimePublicConfig()
   const configured =
     (import.meta.env.VITE_SUPABASE_REDIRECT_URL as string | undefined) || runtimeConfig.VITE_SUPABASE_REDIRECT_URL
+
   if (configured) {
     const configuredUrl = parseUrl(configured)
-    if (configuredUrl && currentUrl && sameOrigin(configured, currentUrl)) return configured
+    if (configuredUrl && configuredUrl.origin === current.origin && !isBlockedHost(configuredUrl.hostname)) {
+      return toRedirectLocation(configuredUrl)
+    }
   }
+
   return currentUrl
 }

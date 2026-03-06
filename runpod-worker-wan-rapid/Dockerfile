@@ -37,6 +37,9 @@ RUN /usr/bin/yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSI
 
 WORKDIR /comfyui
 
+RUN git clone https://github.com/city96/ComfyUI-GGUF /comfyui/custom_nodes/ComfyUI-GGUF \
+    && uv pip install -r /comfyui/custom_nodes/ComfyUI-GGUF/requirements.txt
+
 RUN git clone https://github.com/kijai/ComfyUI-WanVideoWrapper /comfyui/custom_nodes/ComfyUI-WanVideoWrapper \
     && if [ -f /comfyui/custom_nodes/ComfyUI-WanVideoWrapper/requirements.txt ]; then \
          uv pip install -r /comfyui/custom_nodes/ComfyUI-WanVideoWrapper/requirements.txt; \
@@ -45,10 +48,11 @@ RUN git clone https://github.com/kijai/ComfyUI-WanVideoWrapper /comfyui/custom_n
 RUN git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite /comfyui/custom_nodes/ComfyUI-VideoHelperSuite \
     && uv pip install -r /comfyui/custom_nodes/ComfyUI-VideoHelperSuite/requirements.txt
 
-RUN mkdir -p /comfyui/models/checkpoints/WAN /comfyui/models/clip_vision
+RUN mkdir -p /comfyui/models/diffusion_models /comfyui/models/text_encoders /comfyui/models/vae
 
-COPY models/checkpoints/WAN/wan2.2-i2v-rapid-aio.safetensors /comfyui/models/checkpoints/WAN/
-COPY models/clip_vision/clip-vision_vit-h.safetensors /comfyui/models/clip_vision/
+COPY models/unet/wan2.2-rapid-mega-aio-nsfw-v12.1-Q8_0.gguf /comfyui/models/diffusion_models/
+COPY models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors /comfyui/models/text_encoders/
+COPY models/vae/wan_2.1_vae.safetensors /comfyui/models/vae/
 
 WORKDIR /
 

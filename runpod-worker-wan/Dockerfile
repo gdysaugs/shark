@@ -60,7 +60,8 @@ RUN uv pip install runpod requests websocket-client
 
 COPY handler.py /handler.py
 COPY start.sh /start.sh
-RUN chmod +x /start.sh
+RUN sed -i 's/\r$//' /handler.py /start.sh \
+    && chmod +x /start.sh
 
 RUN rm -rf /comfyui/custom_nodes/ComfyUI-Manager
 

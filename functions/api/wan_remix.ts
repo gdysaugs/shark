@@ -29,6 +29,16 @@ const jsonResponse = (body: unknown, status = 200, headers: HeadersInit = {}) =>
     headers: { ...headers, 'Content-Type': 'application/json' },
   })
 
+const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs: number) => {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 const resolveEndpoint = (env: Env) =>
   (env.RUNPOD_WAN_REMIX_ENDPOINT_URL ?? env.RUNPOD_WAN_ENDPOINT_URL ?? env.RUNPOD_ENDPOINT_URL)?.replace(/\/$/, '')
 
@@ -61,15 +71,15 @@ const HIGH_QUALITY_TICKET_COST = 3
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const MAX_PROMPT_LENGTH = 1000
 const MAX_NEGATIVE_PROMPT_LENGTH = 1000
-const FIXED_STEPS = 6
-const RAPID_I2V_FIXED_STEPS = 6
+const FIXED_STEPS = 4
+const RAPID_I2V_FIXED_STEPS = 4
 const MIN_DIMENSION = 256
 const MAX_DIMENSION = 3000
 const MIN_CFG = 0
 const MAX_CFG = 10
-const LOW_QUALITY_FPS = 10
-const MEDIUM_QUALITY_FPS = 12
-const HIGH_QUALITY_FPS = 14
+const LOW_QUALITY_FPS = 8
+const MEDIUM_QUALITY_FPS = 10
+const HIGH_QUALITY_FPS = 12
 const ALLOWED_FPS = [LOW_QUALITY_FPS, MEDIUM_QUALITY_FPS, HIGH_QUALITY_FPS] as const
 const DEFAULT_FPS = MEDIUM_QUALITY_FPS
 const DEFAULT_SECONDS = 6
@@ -656,9 +666,20 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     return ownership.response
   }
 
-  const upstream = await fetch(`${endpoint}/status/${encodeURIComponent(id)}`, {
-    headers: { Authorization: `Bearer ${env.RUNPOD_API_KEY}` },
-  })
+  let upstream: Response
+  try {
+    upstream = await fetchWithTimeout(
+      endpoint + '/status/' + encodeURIComponent(id),
+      { headers: { Authorization: 'Bearer ' + env.RUNPOD_API_KEY } },
+      15000,
+    )
+  } catch (error) {
+    const isTimeout = error instanceof Error && error.name === 'AbortError'
+    if (isTimeout) {
+      return jsonResponse({ id, status: 'IN_PROGRESS', state: 'IN_PROGRESS' }, 200, corsHeaders)
+    }
+    return jsonResponse({ error: 'RunPod status check failed.' }, 502, corsHeaders)
+  }
   const raw = await upstream.text()
   let payload: any = null
   let ticketsLeft: number | null = null

@@ -27,7 +27,7 @@ type QualityPresetKey = 'low' | 'medium' | 'high'
 type QualityPreset = {
   key: QualityPresetKey
   label: string
-  fps: 10 | 12 | 14
+  fps: 8 | 10 | 12
   cost: 1 | 2 | 3
 }
 
@@ -37,13 +37,14 @@ const API_ENDPOINTS: Record<VideoEngine, string> = {
   rapid: '/api/wan-rapid',
 }
 const QUALITY_PRESETS: readonly QualityPreset[] = [
-  { key: 'low', label: '低画質', fps: 10, cost: 1 },
-  { key: 'medium', label: '中画質', fps: 12, cost: 2 },
-  { key: 'high', label: '高画質', fps: 14, cost: 3 },
+  { key: 'low', label: '低画質', fps: 8, cost: 1 },
+  { key: 'medium', label: '中画質', fps: 10, cost: 2 },
+  { key: 'high', label: '高画質', fps: 12, cost: 3 },
 ] as const
 const DEFAULT_QUALITY_INDEX = 1
 const FIXED_VIDEO_SECONDS = 6
-const FIXED_STEPS = 6
+const REMIX_FIXED_STEPS = 4
+const RAPID_FIXED_STEPS = 4
 const DEFAULT_CFG = 1
 const CFG_MIN = 0.1
 const CFG_MAX = 2
@@ -266,6 +267,16 @@ const isFailureStatus = (status: string) => {
   return normalized.includes('fail') || normalized.includes('error') || normalized.includes('cancel')
 }
 
+const isSuccessStatus = (status: string) => {
+  const normalized = status.toLowerCase()
+  return (
+    normalized.includes('complete') ||
+    normalized.includes('success') ||
+    normalized.includes('succeed') ||
+    normalized.includes('finished')
+  )
+}
+
 const extractVideoList = (payload: any) => {
   const output = payload?.output ?? payload?.result ?? payload
   const nested = output?.output ?? output?.result ?? output?.data ?? payload?.output?.output ?? payload?.result?.output
@@ -295,6 +306,21 @@ const extractVideoList = (payload: any) => {
       })
       .filter(Boolean) as string[]
     if (normalized.length) return normalized
+  }
+  const singleCandidates = [
+    output?.video,
+    output?.output_video,
+    output?.url,
+    payload?.video,
+    payload?.output_video,
+    payload?.url,
+    nested?.video,
+    nested?.output_video,
+    nested?.url,
+  ]
+  for (const candidate of singleCandidates) {
+    const normalized = normalizeVideo(candidate)
+    if (normalized) return [normalized]
   }
   return []
 }
@@ -541,7 +567,7 @@ export function Camera() {
         fps: selectedFps,
         seconds: targetSeconds,
         num_frames: targetFrameCount,
-        steps: FIXED_STEPS,
+        steps: videoEngine === 'rapid' ? RAPID_FIXED_STEPS : REMIX_FIXED_STEPS,
         cfg: Number(cfg.toFixed(1)),
         seed: 0,
         randomize_seed: true,
@@ -595,6 +621,10 @@ export function Camera() {
       })
       const res = await fetch(`${getApiEndpoint(engine)}?${query.toString()}`, { headers })
       const data = await res.json().catch(() => ({}))
+      if (res.status === 524 || res.status === 522 || res.status === 504) {
+        await wait(1000)
+        continue
+      }
       if (!res.ok) {
         const rawMessage = data?.error || data?.message || data?.detail || 'Failed to get status.'
         const message = normalizeErrorMessage(rawMessage)
@@ -625,7 +655,10 @@ export function Camera() {
       if (videos.length) {
         return { status: 'done' as const, videos }
       }
-      await wait(2000 + i * 50)
+      if (isSuccessStatus(status)) {
+        throw new Error('生成は完了しましたが動画データを取得できませんでした。')
+      }
+      await wait(1000)
     }
     throw new Error('Generation timed out.')
   }, [])
@@ -1097,7 +1130,7 @@ export function Camera() {
           </label>
 
           <div className="studio-engine">
-            <span className="studio-engine__label">エンジン</span>
+            <span className="studio-engine__label">動画スタイル</span>
             <label className="studio-switch">
               <input
                 type="checkbox"
@@ -1114,7 +1147,7 @@ export function Camera() {
             <button type="button" className="primary-button" onClick={handleGenerate} disabled={!canGenerate}>
               {isRunning ? '生成中...' : '動画を生成'}
             </button>
-            <small>{`コイン消費: 低画質1 / 中画質2 / 高画質3（現在: ${selectedQuality.label}）`}</small>
+            <small>{`コイン消費は画質に応じて変わります（現在: ${selectedQuality.label}）`}</small>
           </div>
 
           <section className="studio-credit-box">

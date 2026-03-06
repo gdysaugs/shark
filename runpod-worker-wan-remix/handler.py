@@ -16,6 +16,9 @@ CHECK_RETRIES = int(os.environ.get("COMFY_API_AVAILABLE_MAX_RETRIES", "500"))
 CHECK_INTERVAL_MS = int(os.environ.get("COMFY_API_AVAILABLE_INTERVAL_MS", "50"))
 WS_CONNECT_TIMEOUT = float(os.environ.get("COMFY_WS_CONNECT_TIMEOUT", "30"))
 WS_RECV_TIMEOUT = float(os.environ.get("COMFY_WS_RECV_TIMEOUT", "60"))
+RETURN_IMAGES = os.environ.get("RETURN_IMAGES", "0") == "1"
+MAX_RESULT_BYTES = int(os.environ.get("MAX_RESULT_BYTES", "9000000"))
+MAX_RESULT_ITEMS = max(1, int(os.environ.get("MAX_RESULT_ITEMS", "1")))
 
 
 def validate_input(job_input):
@@ -141,6 +144,23 @@ def fetch_output_bytes(filename, subfolder, output_type):
   return response.content
 
 
+def append_base64_item(target, filename, payload_bytes, budget):
+  encoded = base64.b64encode(payload_bytes).decode("utf-8")
+  next_size = budget["used"] + len(encoded)
+  if next_size > budget["max"]:
+    return False
+
+  target.append(
+    {
+      "filename": filename,
+      "type": "base64",
+      "data": encoded,
+    }
+  )
+  budget["used"] = next_size
+  return True
+
+
 def handler(job):
   job_input = job.get("input")
   validated, error = validate_input(job_input)
@@ -173,59 +193,54 @@ def handler(job):
     images = []
     videos = []
     gifs = []
+    budget = {"used": 0, "max": MAX_RESULT_BYTES}
     for node_output in outputs.values():
-      for image_info in node_output.get("images", []):
-        if image_info.get("type") == "temp":
-          continue
-        filename = image_info.get("filename")
-        if not filename:
-          continue
-        image_bytes = fetch_output_bytes(
-          filename,
-          image_info.get("subfolder", ""),
-          image_info.get("type"),
-        )
-        images.append(
-          {
-            "filename": filename,
-            "type": "base64",
-            "data": base64.b64encode(image_bytes).decode("utf-8"),
-          }
-        )
+      if RETURN_IMAGES and len(images) < MAX_RESULT_ITEMS:
+        for image_info in node_output.get("images", []):
+          if image_info.get("type") == "temp":
+            continue
+          filename = image_info.get("filename")
+          if not filename:
+            continue
+          image_bytes = fetch_output_bytes(
+            filename,
+            image_info.get("subfolder", ""),
+            image_info.get("type"),
+          )
+          if not append_base64_item(images, filename, image_bytes, budget):
+            return {"error": f"Output too large for RunPod payload limit ({MAX_RESULT_BYTES} chars)."}
+          if len(images) >= MAX_RESULT_ITEMS:
+            break
 
-      for video_info in node_output.get("videos", []):
-        filename = video_info.get("filename")
-        if not filename:
-          continue
-        video_bytes = fetch_output_bytes(
-          filename,
-          video_info.get("subfolder", ""),
-          video_info.get("type"),
-        )
-        videos.append(
-          {
-            "filename": filename,
-            "type": "base64",
-            "data": base64.b64encode(video_bytes).decode("utf-8"),
-          }
-        )
+      if len(videos) < MAX_RESULT_ITEMS:
+        for video_info in node_output.get("videos", []):
+          filename = video_info.get("filename")
+          if not filename:
+            continue
+          video_bytes = fetch_output_bytes(
+            filename,
+            video_info.get("subfolder", ""),
+            video_info.get("type"),
+          )
+          if not append_base64_item(videos, filename, video_bytes, budget):
+            return {"error": f"Output too large for RunPod payload limit ({MAX_RESULT_BYTES} chars)."}
+          if len(videos) >= MAX_RESULT_ITEMS:
+            break
 
-      for gif_info in node_output.get("gifs", []):
-        filename = gif_info.get("filename")
-        if not filename:
-          continue
-        gif_bytes = fetch_output_bytes(
-          filename,
-          gif_info.get("subfolder", ""),
-          gif_info.get("type"),
-        )
-        gifs.append(
-          {
-            "filename": filename,
-            "type": "base64",
-            "data": base64.b64encode(gif_bytes).decode("utf-8"),
-          }
-        )
+      if len(gifs) < MAX_RESULT_ITEMS:
+        for gif_info in node_output.get("gifs", []):
+          filename = gif_info.get("filename")
+          if not filename:
+            continue
+          gif_bytes = fetch_output_bytes(
+            filename,
+            gif_info.get("subfolder", ""),
+            gif_info.get("type"),
+          )
+          if not append_base64_item(gifs, filename, gif_bytes, budget):
+            return {"error": f"Output too large for RunPod payload limit ({MAX_RESULT_BYTES} chars)."}
+          if len(gifs) >= MAX_RESULT_ITEMS:
+            break
 
     if not images and not videos and not gifs:
       return {"status": "success_no_outputs", "images": [], "videos": [], "gifs": []}

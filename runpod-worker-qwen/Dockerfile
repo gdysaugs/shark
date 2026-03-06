@@ -42,6 +42,7 @@ RUN git clone https://github.com/city96/ComfyUI-GGUF /comfyui/custom_nodes/Comfy
     && uv pip install -r /comfyui/custom_nodes/ComfyUI-GGUF/requirements.txt
 
 RUN mkdir -p /comfyui/models/unet /comfyui/models/loras /comfyui/models/text_encoders /comfyui/models/vae
+RUN mkdir -p /opt/embedded-models/loras
 
 COPY models/unet/qwen-image-edit-2511-Q4_K_M.gguf /comfyui/models/unet/
 COPY models/loras/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors /comfyui/models/loras/
@@ -49,8 +50,10 @@ COPY models/loras/Qwen_Snofs_1_3.safetensors /comfyui/models/loras/
 COPY models/loras/qwen-edit-skin_1.1_000002750.safetensors /comfyui/models/loras/
 COPY models/loras/qwen-image-edit-2511-multiple-angles-lora.safetensors /comfyui/models/loras/
 COPY ["models/loras/NSFW Female Enhancer Qwen V0.3.safetensors", "/comfyui/models/loras/"]
+COPY models/loras/ /opt/embedded-models/loras/
 COPY models/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors /comfyui/models/text_encoders/
 COPY models/vae/qwen_image_vae.safetensors /comfyui/models/vae/
+COPY extra_model_paths.yaml /opt/embedded-models/extra_model_paths.yaml
 
 WORKDIR /
 
@@ -58,6 +61,7 @@ RUN uv pip install runpod requests websocket-client
 
 COPY handler.py /handler.py
 COPY start.sh /start.sh
-RUN chmod +x /start.sh
+RUN sed -i 's/\r$//' /handler.py /start.sh \
+    && chmod +x /start.sh
 
 CMD ["/start.sh"]

@@ -11,7 +11,7 @@
   "2": {
     "class_type": "KSampler",
     "inputs": {
-      "model": ["1", 0],
+      "model": ["10", 0],
       "seed": 0,
       "steps": 4,
       "cfg": 1,
@@ -99,6 +99,17 @@
     },
     "_meta": {
       "title": "Final Image Size"
+    }
+  },
+  "10": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": ["1", 0],
+      "lora_name": "qwen-image-edit-2511-multiple-angles-lora.safetensors",
+      "strength_model": 1
+    },
+    "_meta": {
+      "title": "Multiple Angles LoRA"
     }
   }
 }

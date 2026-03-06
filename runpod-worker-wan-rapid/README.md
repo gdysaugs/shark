@@ -1,25 +1,38 @@
-# RunPod worker: Wan 2.2 I2V Rapid (separate)
+# RunPod worker: Wan 2.2 I2V Rapid (SmoothMix Safetensors High/Low)
 
 This worker is separate from the existing remix worker.
 Use it with a different RunPod endpoint and select `Rapid AIO` in the UI.
 
 ## Required model files
 
-- `models/checkpoints/WAN/wan2.2-i2v-rapid-aio.safetensors`
+- `models/diffusion_models/<SmoothMix High safetensors>`
+- `models/diffusion_models/<SmoothMix Low safetensors>`
+- `models/loras/lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors`
+- `models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors`
+- `models/vae/wan_2.1_vae.safetensors`
 - `models/clip_vision/clip-vision_vit-h.safetensors`
+
+Use these exact filenames in `models/diffusion_models/`:
+
+- `smoothMixWan2214BI2V_i2vV20High.safetensors`
+- `smoothMixWan2214BI2V_i2vV20Low.safetensors`
+
+The rapid API workflow applies Lightx2v LoRA automatically with:
+
+- High strength: `3.0`
+- Low strength: `1.5`
 
 ## Build
 
 ```bash
-cd /home/adama/LTX2/runpod-worker-wan-rapid
-docker build -t wan2.2-i2v-rapid .
+cd /home/adama/sparkart/runpod-worker-wan-rapid
+docker build -t suarez123/wan22-tastysin-v8-i2v:smoothmix-v20-i2v-sft .
 ```
 
-## Push example
+## Push
 
 ```bash
-docker tag wan2.2-i2v-rapid suarez123/wan-i2v-gguf:rapid-v1
-docker push suarez123/wan-i2v-gguf:rapid-v1
+docker push suarez123/wan22-tastysin-v8-i2v:smoothmix-v20-i2v-sft
 ```
 
 ## RunPod setting
@@ -30,5 +43,5 @@ Set this endpoint in Pages secret:
 
 Then UI model switch works:
 
-- `Remix（既存）` -> existing endpoint
-- `Rapid AIO（新規）` -> rapid endpoint
+- `Remix` -> existing endpoint
+- `Rapid AIO` -> rapid endpoint

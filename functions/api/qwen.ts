@@ -36,14 +36,19 @@ const normalizeEndpoint = (value?: string) => {
   try {
     const parsed = new URL(normalized)
     if (!/^https?:$/.test(parsed.protocol)) return ''
-    return normalized
+    const segments = parsed.pathname.split('/').filter(Boolean)
+    if (segments.length >= 2 && segments[0].toLowerCase() === 'v2') {
+      return `${parsed.origin}/v2/${segments[1]}`
+    }
+    const cleanedPath = parsed.pathname.replace(/\/+$/, '').replace(/\/run(?:sync)?$/i, '')
+    return `${parsed.origin}${cleanedPath}`
   } catch {
     return ''
   }
 }
 
 const DEFAULT_ZIMAGE_ENDPOINT = 'https://api.runpod.ai/v2/nk5f686wu3645s'
-const DEFAULT_QWEN_EDIT_ENDPOINT = 'https://api.runpod.ai/v2/278qoim6xsktcb'
+const DEFAULT_QWEN_EDIT_ENDPOINT = 'https://api.runpod.ai/v2/h7p0hwtyzvndp5'
 
 type WorkflowVariant = 'zimage' | 'qwen_edit'
 

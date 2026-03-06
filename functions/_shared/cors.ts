@@ -3,6 +3,9 @@ type CorsEnv = {
 }
 
 const DEFAULT_ALLOWED_ORIGINS = [
+  'https://sparkart.work',
+  'https://sparkart.pages.dev',
+  '*.sparkart.pages.dev',
   'https://sparkmotion.work',
   'https://www.sparkmotion.work',
   'https://ltx2.pages.dev',
