@@ -55,20 +55,24 @@ type NodeMap = Partial<{
 }>
 
 const SIGNUP_TICKET_GRANT = 5
-const BASE_VIDEO_TICKET_COST = 1
-const EIGHT_SECOND_MODE_TICKET_COST = 2
+const LOW_QUALITY_TICKET_COST = 1
+const MEDIUM_QUALITY_TICKET_COST = 2
+const HIGH_QUALITY_TICKET_COST = 3
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const MAX_PROMPT_LENGTH = 1000
 const MAX_NEGATIVE_PROMPT_LENGTH = 1000
-const FIXED_STEPS = 4
-const RAPID_I2V_FIXED_STEPS = 4
+const FIXED_STEPS = 6
+const RAPID_I2V_FIXED_STEPS = 6
 const MIN_DIMENSION = 256
 const MAX_DIMENSION = 3000
 const MIN_CFG = 0
 const MAX_CFG = 10
-const FIXED_FPS = 12
+const LOW_QUALITY_FPS = 10
+const MEDIUM_QUALITY_FPS = 12
+const HIGH_QUALITY_FPS = 14
+const ALLOWED_FPS = [LOW_QUALITY_FPS, MEDIUM_QUALITY_FPS, HIGH_QUALITY_FPS] as const
+const DEFAULT_FPS = MEDIUM_QUALITY_FPS
 const DEFAULT_SECONDS = 6
-const EIGHT_SECOND_MODE_SECONDS = 8
 const FIXED_SIZE_MULTIPLE = 64
 const FIXED_MAX_LONG_SIDE = 768
 const DEFAULT_WIDTH = 768
@@ -411,8 +415,8 @@ const resolveTicketCostForUsage = async (
     }
   }
 
-  const seconds = extractSecondsFromPayload(payload)
-  return ticketCostForSeconds(seconds)
+  const fps = extractFpsFromPayload(payload)
+  return ticketCostForFps(fps)
 }
 
 const ensureUsageOwnership = async (
@@ -528,26 +532,34 @@ const estimateBase64Bytes = (value: string) => {
 
 const normalizeSeconds = (_value: unknown) => DEFAULT_SECONDS
 
-const ticketCostForSeconds = (seconds: number) =>
-  seconds === EIGHT_SECOND_MODE_SECONDS ? EIGHT_SECOND_MODE_TICKET_COST : BASE_VIDEO_TICKET_COST
+const normalizeFps = (value: unknown): (typeof ALLOWED_FPS)[number] => {
+  const requested = Math.floor(Number(value))
+  return ALLOWED_FPS.find((item) => item === requested) ?? DEFAULT_FPS
+}
 
-const extractSecondsFromPayload = (payload: any) => {
+const ticketCostForFps = (fps: number) => {
+  if (fps >= HIGH_QUALITY_FPS) return HIGH_QUALITY_TICKET_COST
+  if (fps <= LOW_QUALITY_FPS) return LOW_QUALITY_TICKET_COST
+  return MEDIUM_QUALITY_TICKET_COST
+}
+
+const extractFpsFromPayload = (payload: any) => {
   const candidates = [
-    payload?.input?.seconds,
-    payload?.seconds,
-    payload?.output?.input?.seconds,
-    payload?.output?.seconds,
-    payload?.result?.input?.seconds,
-    payload?.result?.seconds,
-    payload?.metadata?.seconds,
-    payload?.output?.metadata?.seconds,
-    payload?.result?.metadata?.seconds,
+    payload?.input?.fps,
+    payload?.fps,
+    payload?.output?.input?.fps,
+    payload?.output?.fps,
+    payload?.result?.input?.fps,
+    payload?.result?.fps,
+    payload?.metadata?.fps,
+    payload?.output?.metadata?.fps,
+    payload?.result?.metadata?.fps,
   ]
   for (const value of candidates) {
     if (value === undefined || value === null) continue
-    return normalizeSeconds(value)
+    return normalizeFps(value)
   }
-  return DEFAULT_SECONDS
+  return DEFAULT_FPS
 }
 
 const clampDimension = (value: number, maxLongSide: number) => {
@@ -790,10 +802,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const requestedWidth = Math.floor(Number(input?.width ?? DEFAULT_WIDTH))
   const requestedHeight = Math.floor(Number(input?.height ?? DEFAULT_HEIGHT))
   const seconds = normalizeSeconds(input?.seconds ?? DEFAULT_SECONDS)
-  const ticketCost = ticketCostForSeconds(seconds)
-  const fps = FIXED_FPS
+  const fps = normalizeFps(input?.fps)
+  const ticketCost = ticketCostForFps(fps)
   const numFrames =
-    !isT2V && workflowFlavor === 'rapid' ? FIXED_FPS * seconds + 1 : FIXED_FPS * seconds
+    !isT2V && workflowFlavor === 'rapid' ? fps * seconds + 1 : fps * seconds
   const seed = input?.randomize_seed
     ? Math.floor(Math.random() * 2147483647)
     : Number(input?.seed ?? 0)

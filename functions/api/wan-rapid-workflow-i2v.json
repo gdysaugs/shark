@@ -27,12 +27,12 @@
         0
       ],
       "noise_seed": 0,
-      "steps": 4,
+      "steps": 6,
       "start_at_step": 2,
       "add_noise": "disable",
       "control_after_generate": "fixed",
       "cfg": 1,
-      "sampler_name": "euler_ancestral",
+      "sampler_name": "uni_pc_bh2",
       "scheduler": "simple",
       "end_at_step": 10000,
       "return_with_leftover_noise": "disable"
@@ -155,12 +155,12 @@
         2
       ],
       "noise_seed": 0,
-      "steps": 4,
+      "steps": 6,
       "end_at_step": 2,
       "add_noise": "enable",
       "control_after_generate": "fixed",
       "cfg": 1,
-      "sampler_name": "euler_ancestral",
+      "sampler_name": "uni_pc_bh2",
       "scheduler": "simple",
       "start_at_step": 0,
       "return_with_leftover_noise": "enable"
@@ -195,7 +195,7 @@
         0
       ],
       "lora_name": "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
-      "strength_model": 3
+      "strength_model": 1
     }
   },
   "112": {
@@ -206,7 +206,7 @@
         0
       ],
       "lora_name": "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
-      "strength_model": 1.5
+      "strength_model": 1
     }
   },
   "6": {

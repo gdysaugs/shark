@@ -418,6 +418,37 @@
   min-height: 92px;
 }
 
+.studio-quality-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.studio-quality-buttons__btn {
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  text-align: center;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.studio-quality-buttons__btn.is-active {
+  border-color: #3b82f6;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.studio-quality-buttons__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .studio-engine {
   display: flex;
   align-items: center;
@@ -1193,4 +1224,242 @@
   .video-studio-page .nova-highlight-card p {
     font-size: 0.74rem;
   }
+}
+
+/* Orange Theme Override */
+.video-studio-page {
+  --camera-ink: #4a1d0b;
+  --camera-muted: #9a3412;
+  --camera-accent: #ea580c;
+  --camera-accent-strong: #f97316;
+  --camera-soft: #fff7ed;
+  --camera-card: rgba(255, 247, 237, 0.96);
+  --camera-shadow: rgba(154, 52, 18, 0.16);
+  --camera-outline: rgba(251, 146, 60, 0.4);
+  --camera-panel: rgba(255, 245, 235, 0.94);
+  --camera-panel-strong: rgba(255, 250, 245, 0.96);
+  background: #fff7ed;
+  color: #4a1d0b;
+}
+
+.video-studio-page.camera-app {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(251, 146, 60, 0.28), transparent 42%),
+    radial-gradient(circle at 90% 12%, rgba(249, 115, 22, 0.2), transparent 40%),
+    radial-gradient(circle at 68% 84%, rgba(234, 88, 12, 0.16), transparent 46%),
+    linear-gradient(180deg, #fff7ed, #ffedd5 58%, #fed7aa);
+}
+
+.video-studio-page .top-nav {
+  background: rgba(255, 250, 245, 0.94);
+  border-bottom: 1px solid #fdba74;
+  box-shadow: 0 8px 22px rgba(194, 65, 12, 0.16);
+}
+
+.video-studio-page .top-nav__title {
+  color: #7c2d12;
+}
+
+.video-studio-page .top-nav__link {
+  color: #9a3412;
+}
+
+.video-studio-page .top-nav__link:hover {
+  color: #7c2d12;
+  background: #ffedd5;
+}
+
+.video-studio-page .top-nav__link.is-active {
+  background: linear-gradient(135deg, #ea580c, #f97316);
+  color: #fff7ed;
+  box-shadow: 0 8px 18px rgba(194, 65, 12, 0.32);
+}
+
+.video-studio-page .primary-button,
+.video-studio-page .primary-button--pink {
+  background: linear-gradient(135deg, #ea580c, #fb923c);
+  color: #fff7ed;
+  box-shadow: 0 10px 22px rgba(194, 65, 12, 0.28);
+}
+
+.video-studio-page .primary-button:hover:not(:disabled),
+.video-studio-page .primary-button--pink:hover:not(:disabled) {
+  box-shadow: 0 12px 24px rgba(194, 65, 12, 0.34);
+}
+
+.video-studio-page .ghost-button {
+  background: #fffaf5;
+  color: #7c2d12;
+  border-color: #fdba74;
+  box-shadow: 0 4px 10px rgba(194, 65, 12, 0.12);
+}
+
+.video-studio-page .ghost-button:hover:not(:disabled) {
+  background: #ffedd5;
+  border-color: #fb923c;
+  color: #7c2d12;
+}
+
+.video-studio-page .studio-mode-switch,
+.video-studio-page .studio-logout-bar,
+.video-studio-page .studio-block,
+.video-studio-page .studio-ticket,
+.video-studio-page .studio-engine,
+.video-studio-page .studio-credit-box {
+  border-color: #fdba74;
+  background: #fffaf5;
+}
+
+.video-studio-page .studio-mode-switch__btn.is-active {
+  border-color: #fdba74;
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.video-studio-page .studio-upload {
+  background: linear-gradient(135deg, #fb923c, #f97316, #ea580c);
+}
+
+.video-studio-page .studio-upload:hover {
+  background: linear-gradient(135deg, #f97316, #fb923c, #ea580c);
+  box-shadow: 0 16px 28px rgba(249, 115, 22, 0.24);
+}
+
+.video-studio-page .studio-upload__inner {
+  background: linear-gradient(135deg, #fffaf5, #ffedd5);
+}
+
+.video-studio-page .studio-upload__icon {
+  background: linear-gradient(135deg, #ea580c, #fb923c);
+  box-shadow: 0 8px 16px rgba(194, 65, 12, 0.22);
+}
+
+.video-studio-page .studio-upload__chip {
+  background: linear-gradient(135deg, #ffedd5, #fed7aa);
+  color: #9a3412;
+}
+
+.video-studio-page .studio-field textarea,
+.video-studio-page .email-login-card input {
+  border-color: #fdba74;
+  background: #fff;
+}
+
+.video-studio-page .studio-field textarea:focus,
+.video-studio-page .email-login-card input:focus {
+  border-color: #fb923c;
+  box-shadow: 0 0 0 2px rgba(251, 146, 60, 0.25);
+}
+
+.video-studio-page .studio-field input[type='range'] {
+  accent-color: #ea580c;
+}
+
+.video-studio-page .studio-quality-buttons__btn {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.video-studio-page .studio-quality-buttons__btn.is-active {
+  border-color: #fb923c;
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.video-studio-page .studio-switch input:checked + .studio-switch__track {
+  background: #ea580c;
+  border-color: #ea580c;
+}
+
+.video-studio-page .studio-bonus-pill {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.video-studio-page .studio-bonus-pill.is-ready {
+  border-color: #fdba74;
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.video-studio-page .studio-bonus-panel {
+  border-color: #fed7aa;
+  background: linear-gradient(145deg, #fffaf5, #ffedd5 55%, #fed7aa);
+}
+
+.video-studio-page .studio-bonus-panel__icon {
+  background: linear-gradient(135deg, #ea580c, #fb923c);
+  box-shadow: 0 8px 16px rgba(194, 65, 12, 0.22);
+}
+
+.video-studio-page .modal-card {
+  border-color: #fdba74;
+  background: #fffaf5;
+}
+
+.video-studio-page .modal-card h3 {
+  color: #7c2d12;
+}
+
+.video-studio-page .modal-card p {
+  color: #9a3412;
+}
+
+.video-studio-page .nova-highlight-card {
+  border-color: rgba(249, 115, 22, 0.34);
+  background:
+    radial-gradient(circle at 12% 10%, rgba(251, 146, 60, 0.32), transparent 40%),
+    radial-gradient(circle at 86% 88%, rgba(234, 88, 12, 0.22), transparent 42%),
+    linear-gradient(160deg, #fffaf5, #ffedd5);
+  box-shadow:
+    0 12px 24px rgba(194, 65, 12, 0.16),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.75);
+}
+
+.video-studio-page .nova-highlight-card h3 {
+  color: #7c2d12;
+}
+
+.video-studio-page .nova-highlight-card p {
+  color: #9a3412;
+}
+
+.video-studio-page .guest-headline h1 {
+  color: #7c2d12;
+  text-shadow: 0 10px 24px rgba(194, 65, 12, 0.16);
+}
+
+.video-studio-page .guest-headline__quick span {
+  color: #fff7ed;
+  background: linear-gradient(140deg, #f97316, #c2410c);
+  border-color: #fdba74;
+  box-shadow: 0 10px 18px rgba(194, 65, 12, 0.22);
+}
+
+.video-studio-page .guest-howto {
+  border-color: #fdba74;
+  background: rgba(255, 237, 213, 0.75);
+  box-shadow: 0 18px 32px rgba(194, 65, 12, 0.14);
+}
+
+.video-studio-page .guest-howto__header h2,
+.video-studio-page .guest-howto__label,
+.video-studio-page .email-login-card h1 {
+  color: #7c2d12;
+}
+
+.video-studio-page .guest-howto__header p,
+.video-studio-page .guest-howto__prompt,
+.video-studio-page .email-login-card p,
+.video-studio-page .email-login-card label,
+.video-studio-page .email-login-card small {
+  color: #9a3412;
+}
+
+.video-studio-page .email-login-card {
+  border-color: #fdba74;
+  background: #fffaf5;
+  box-shadow: 0 20px 38px rgba(194, 65, 12, 0.14);
 }

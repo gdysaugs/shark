@@ -23,15 +23,27 @@ type RenderResult = {
 
 type VideoEngine = 'remix' | 'rapid'
 type GenerationMode = 'i2v' | 'qwen_edit'
+type QualityPresetKey = 'low' | 'medium' | 'high'
+type QualityPreset = {
+  key: QualityPresetKey
+  label: string
+  fps: 10 | 12 | 14
+  cost: 1 | 2 | 3
+}
 
 const MAX_PARALLEL = 1
 const API_ENDPOINTS: Record<VideoEngine, string> = {
   remix: '/api/wan-remix',
   rapid: '/api/wan-rapid',
 }
-const FIXED_FPS = 12
+const QUALITY_PRESETS: readonly QualityPreset[] = [
+  { key: 'low', label: '低画質', fps: 10, cost: 1 },
+  { key: 'medium', label: '中画質', fps: 12, cost: 2 },
+  { key: 'high', label: '高画質', fps: 14, cost: 3 },
+] as const
+const DEFAULT_QUALITY_INDEX = 1
 const FIXED_VIDEO_SECONDS = 6
-const FIXED_STEPS = 4
+const FIXED_STEPS = 6
 const DEFAULT_CFG = 1
 const CFG_MIN = 0.1
 const CFG_MAX = 2
@@ -291,6 +303,7 @@ const extractJobId = (payload: any) => payload?.id || payload?.jobId || payload?
 
 export function Camera() {
   const [generationMode, setGenerationMode] = useState<GenerationMode>('i2v')
+  const [qualityIndex, setQualityIndex] = useState(DEFAULT_QUALITY_INDEX)
   const [prompt, setPrompt] = useState('')
   const [negativePrompt, setNegativePrompt] = useState('')
   const [cfg, setCfg] = useState(DEFAULT_CFG)
@@ -319,16 +332,18 @@ export function Camera() {
   const runIdRef = useRef(0)
   const bonusRouletteTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const sourceImageInputRef = useRef<HTMLInputElement | null>(null)
-  const selectedTicketCost = 1
 
   const totalFrames = results.length || 1
   const completedCount = useMemo(() => results.filter((item) => item.video).length, [results])
   const progress = totalFrames ? completedCount / totalFrames : 0
   const displayVideo = results[0]?.video ?? null
   const accessToken = session?.access_token ?? ''
-  const canGenerate = prompt.trim().length > 0 && Boolean(sourceImageFile) && !isRunning
+  const selectedQuality = QUALITY_PRESETS[qualityIndex] ?? QUALITY_PRESETS[DEFAULT_QUALITY_INDEX]
+  const selectedFps = selectedQuality.fps
   const isI2vMode = generationMode === 'i2v'
   const generationLabel = isI2vMode ? '動画生成' : '画像生成'
+  const selectedTicketCost = isI2vMode ? selectedQuality.cost : 1
+  const canGenerate = prompt.trim().length > 0 && Boolean(sourceImageFile) && !isRunning
 
   const getLatestAccessToken = useCallback(async () => {
     if (!supabase) return accessToken
@@ -509,7 +524,7 @@ export function Camera() {
       const dims = toVideoDimensions(imageSize.width, imageSize.height)
       const imageDataUrl = await fileToResizedPngDataUrl(sourceImageFile, dims.width, dims.height)
       const targetSeconds = FIXED_VIDEO_SECONDS
-      const targetFrameCount = FIXED_FPS * targetSeconds + 1
+      const targetFrameCount = selectedFps * targetSeconds + 1
       const stabilizedPrompt = `${prompt}, keep same person identity, keep same face, keep same camera distance, no zoom in`
       const stabilizedNegative = [negativePrompt, 'zoom in, close-up, crop, face distortion, identity change']
         .filter(Boolean)
@@ -523,7 +538,7 @@ export function Camera() {
         negative_prompt: stabilizedNegative,
         width: dims.width,
         height: dims.height,
-        fps: FIXED_FPS,
+        fps: selectedFps,
         seconds: targetSeconds,
         num_frames: targetFrameCount,
         steps: FIXED_STEPS,
@@ -564,7 +579,7 @@ export function Camera() {
       if (!jobId) throw new Error('Failed to get job id.')
       return { jobId }
     },
-    [cfg, negativePrompt, prompt, sourceImageFile, videoEngine],
+    [cfg, negativePrompt, prompt, selectedFps, sourceImageFile, videoEngine],
   )
 
   const pollJob = useCallback(async (jobId: string, runId: number, token?: string, engine: VideoEngine = DEFAULT_ENGINE) => {
@@ -1063,6 +1078,24 @@ export function Camera() {
             <small>CFGはプロンプトの効きやすさです。</small>
           </label>
 
+          <label className="studio-field studio-field--sub">
+            <span>画質</span>
+            <div className="studio-quality-buttons" role="group" aria-label="画質選択">
+              {QUALITY_PRESETS.map((preset, index) => (
+                <button
+                  key={preset.key}
+                  type="button"
+                  className={`studio-quality-buttons__btn${index === qualityIndex ? ' is-active' : ''}`}
+                  onClick={() => setQualityIndex(index)}
+                  disabled={isRunning}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <small>{`現在: ${selectedQuality.label}`}</small>
+          </label>
+
           <div className="studio-engine">
             <span className="studio-engine__label">エンジン</span>
             <label className="studio-switch">
@@ -1073,7 +1106,7 @@ export function Camera() {
                 disabled={isRunning}
               />
               <span className="studio-switch__track" aria-hidden="true" />
-              <strong>{videoEngine === 'rapid' ? 'SmoothMix v2.0' : 'Spark'}</strong>
+              <strong>{videoEngine === 'rapid' ? '動き重視' : '安定重視'}</strong>
             </label>
           </div>
 
@@ -1081,9 +1114,7 @@ export function Camera() {
             <button type="button" className="primary-button" onClick={handleGenerate} disabled={!canGenerate}>
               {isRunning ? '生成中...' : '動画を生成'}
             </button>
-            <small>Sparkはプロンプトに忠実で、動きがより滑らかです。</small>
-            <small>SmoothMix v2.0（High/Low safetensors）ベースです。</small>
-            <small>コイン消費: 1回につき1コイン</small>
+            <small>{`コイン消費: 低画質1 / 中画質2 / 高画質3（現在: ${selectedQuality.label}）`}</small>
           </div>
 
           <section className="studio-credit-box">
