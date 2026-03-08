@@ -21,6 +21,7 @@ const FIXED_CFG = 1
 const FIXED_WIDTH = 1024
 const FIXED_HEIGHT = 1024
 const FIXED_ANGLE_STRENGTH = 0
+const COIN_PURCHASE_URL = 'https://checkoutcoins2.win/purchase.html'
 const PLACEHOLDER_IMAGE_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z9WQAAAAASUVORK5CYII='
 
@@ -51,14 +52,14 @@ const normalizeImage = (value: unknown, filename?: string) => {
 const base64ToBlob = (base64: string, mime: string) => {
   const chunkSize = 0x8000
   const byteChars = atob(base64)
-  const byteArrays: Uint8Array[] = []
+  const byteArrays: ArrayBuffer[] = []
   for (let offset = 0; offset < byteChars.length; offset += chunkSize) {
     const slice = byteChars.slice(offset, offset + chunkSize)
     const byteNumbers = new Array(slice.length)
     for (let i = 0; i < slice.length; i += 1) {
       byteNumbers[i] = slice.charCodeAt(i)
     }
-    byteArrays.push(new Uint8Array(byteNumbers))
+    byteArrays.push(new Uint8Array(byteNumbers).buffer)
   }
   return new Blob(byteArrays, { type: mime })
 }
@@ -390,13 +391,24 @@ export function TextImage() {
       try {
         const submitted = await submitImage(accessToken)
         if (runIdRef.current !== runId) return
-        if ('images' in submitted && submitted.images.length) {
-          setResult({ id: makeId(), status: 'done', image: submitted.images[0] })
-          setStatusMessage('完了')
-          if (accessToken) void fetchTickets(accessToken)
-          return
+        if ('images' in submitted) {
+          const immediateImages = Array.isArray(submitted.images) ? submitted.images : []
+          if (immediateImages.length) {
+            setResult({ id: makeId(), status: 'done', image: immediateImages[0] })
+            setStatusMessage('完了')
+            if (accessToken) void fetchTickets(accessToken)
+            return
+          }
         }
-        const polled = await pollJob(submitted.jobId, submitted.usageId, runId, accessToken)
+        if (!('jobId' in submitted) || !('usageId' in submitted)) {
+          throw new Error('ジョブ情報の取得に失敗しました。')
+        }
+        const jobId = typeof submitted.jobId === 'string' ? submitted.jobId : ''
+        const usageId = typeof submitted.usageId === 'string' ? submitted.usageId : ''
+        if (!jobId || !usageId) {
+          throw new Error('ジョブ情報の取得に失敗しました。')
+        }
+        const polled = await pollJob(jobId, usageId, runId, accessToken)
         if (runIdRef.current !== runId) return
         if (polled.status === 'done' && polled.images.length) {
           setResult({ id: makeId(), status: 'done', image: polled.images[0] })
@@ -643,7 +655,18 @@ export function TextImage() {
               <button type='button' className='ghost-button' onClick={() => setShowTicketModal(false)}>
                 閉じる
               </button>
-              <button type='button' className='primary-button' onClick={() => navigate('/purchase')}>
+              <button
+                type='button'
+                className='primary-button'
+                onClick={() => {
+                  const popup = window.open(COIN_PURCHASE_URL, '_blank')
+                  if (popup) {
+                    popup.opener = null
+                    return
+                  }
+                  window.location.href = COIN_PURCHASE_URL
+                }}
+              >
                 購入する
               </button>
             </div>

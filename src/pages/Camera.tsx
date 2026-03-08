@@ -58,7 +58,8 @@ const DEFAULT_ENGINE: VideoEngine = 'rapid'
 const PROMPT_MAX_LENGTH = 1000
 const PROMPT_PLACEHOLDER = '例: 女が両手で胸を揉む'
 const getApiEndpoint = (engine: VideoEngine) => API_ENDPOINTS[engine] ?? API_ENDPOINTS.remix
-const COIN_PURCHASE_URL = 'https://checkoutcoins.uk/purchase#'
+const COIN_PURCHASE_URL = 'https://checkoutcoins2.win/purchase.html'
+const SPARKMOTION_URL = 'https://sparkmotion.work/'
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -154,14 +155,14 @@ const normalizeVideo = (value: unknown, filename?: string) => {
 const base64ToBlob = (base64: string, mime: string) => {
   const chunkSize = 0x8000
   const byteChars = atob(base64)
-  const byteArrays: Uint8Array[] = []
+  const byteArrays: ArrayBuffer[] = []
   for (let offset = 0; offset < byteChars.length; offset += chunkSize) {
     const slice = byteChars.slice(offset, offset + chunkSize)
     const byteNumbers = new Array(slice.length)
     for (let i = 0; i < slice.length; i += 1) {
       byteNumbers[i] = slice.charCodeAt(i)
     }
-    byteArrays.push(new Uint8Array(byteNumbers))
+    byteArrays.push(new Uint8Array(byteNumbers).buffer)
   }
   return new Blob(byteArrays, { type: mime })
 }
@@ -966,7 +967,7 @@ export function Camera() {
 
   const handleDownload = useCallback(async () => {
     if (!displayVideo) return
-    const filename = `sparkmotion-video.${isGif ? 'gif' : 'mp4'}`
+    const filename = `sparkart-video.${isGif ? 'gif' : 'mp4'}`
     try {
       let blob: Blob
       if (displayVideo.startsWith('data:')) {
@@ -1056,9 +1057,19 @@ export function Camera() {
               {ticketStatus !== 'loading' && `保有コイン数 ${ticketCount ?? 0}枚` }
               {ticketStatus === 'error' && ticketMessage ? ` / ${ticketMessage}` : ''}
             </div>
-            <button type="button" className="ghost-button studio-buy-button" onClick={handleOpenPurchaseConfirm}>
-              コインを購入する
-            </button>
+            <div className="studio-ticket-actions">
+              <button type="button" className="ghost-button studio-buy-button" onClick={handleOpenPurchaseConfirm}>
+                コインを購入する
+              </button>
+              <a
+                className="ghost-button studio-sparkmotion-button"
+                href={SPARKMOTION_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                SparkMotionを使う
+              </a>
+            </div>
           </div>
 
           <label className="studio-upload">
@@ -1312,7 +1323,7 @@ export function Camera() {
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-card">
             <h3>購入ページへ移動</h3>
-            <p>購入ページに移動します。表示されたページで再度ログインしてください。購入ページで購入したコインは即座にSparkMotionにも反映されます。</p>
+            <p>購入ページに移動します。表示されたページで再度ログインしてください。購入ページで購入したコインは即座にSpark Artにも反映されます。</p>
             <div className="modal-actions">
               <button type="button" className="primary-button" onClick={handleConfirmPurchaseMove}>
                 はい
