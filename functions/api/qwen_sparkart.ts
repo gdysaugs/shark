@@ -26,6 +26,10 @@ const jsonResponse = (body: unknown, status = 200, headers: HeadersInit = {}) =>
     headers: { ...headers, 'Content-Type': 'application/json' },
   })
 
+const INTERNAL_ERROR_MESSAGE = 'エラーです。やり直してください。'
+const internalErrorResponse = (corsHeaders: HeadersInit) =>
+  jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 500, corsHeaders)
+
 const normalizeEndpoint = (value?: string) => {
   if (!value) return ''
   const trimmed = value.trim().replace(/^['\"]|['\"]$/g, '')
@@ -181,7 +185,7 @@ const ensureTicketAvailable = async (
 
   const { data: existing, error } = await ensureTicketRow(admin, user)
   if (error) {
-    return { response: jsonResponse({ error: error.message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
   if (!existing) {
     return { response: jsonResponse({ error: 'No tickets remaining.' }, 402, corsHeaders) }
@@ -212,7 +216,7 @@ const consumeTicket = async (
 
   const { data: existing, error } = await fetchTicketRow(admin, user)
   if (error) {
-    return { response: jsonResponse({ error: error.message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
   if (!existing) {
     return { response: jsonResponse({ error: 'No tickets available.' }, 402, corsHeaders) }
@@ -238,7 +242,7 @@ const consumeTicket = async (
     if (message.includes('INVALID')) {
       return { response: jsonResponse({ error: 'Invalid ticket request.' }, 400, corsHeaders) }
     }
-    return { response: jsonResponse({ error: message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
 
   const result = Array.isArray(rpcData) ? rpcData[0] : rpcData
@@ -271,7 +275,7 @@ const refundTicket = async (
     .maybeSingle()
 
   if (chargeError) {
-    return { response: jsonResponse({ error: chargeError.message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
 
   const chargeUserId = chargeEvent?.user_id ? String(chargeEvent.user_id) : ''
@@ -290,7 +294,7 @@ const refundTicket = async (
     .maybeSingle()
 
   if (refundCheckError) {
-    return { response: jsonResponse({ error: refundCheckError.message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
 
   if (existingRefund) {
@@ -299,7 +303,7 @@ const refundTicket = async (
 
   const { data: existing, error } = await ensureTicketRow(admin, user)
   if (error) {
-    return { response: jsonResponse({ error: error.message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
   if (!existing) {
     return { response: jsonResponse({ error: 'No tickets available.' }, 402, corsHeaders) }
@@ -321,7 +325,7 @@ const refundTicket = async (
     if (message.includes('INVALID')) {
       return { response: jsonResponse({ error: message }, 400, corsHeaders) }
     }
-    return { response: jsonResponse({ error: message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
 
   const result = Array.isArray(rpcData) ? rpcData[0] : rpcData
@@ -346,7 +350,7 @@ const ensureUsageOwnership = async (
     .maybeSingle()
 
   if (chargeError) {
-    return { response: jsonResponse({ error: chargeError.message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
   if (!chargeEvent) {
     return { response: jsonResponse({ error: 'Job not found.' }, 404, corsHeaders) }
@@ -540,14 +544,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
-    return jsonResponse(
-      {
-        error: 'Qwen status request failed.',
-        detail: error instanceof Error ? error.message : 'unknown_error',
-      },
-      502,
-      corsHeaders,
-    )
+    return jsonResponse({ error: 'Qwen status request failed.' }, 502, corsHeaders)
   }
 }
 
@@ -663,14 +660,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         setNodeInput(workflow, '2', 'model', ['1', 0])
       }
     } catch (error) {
-      return jsonResponse(
-        {
-          error: 'Workflow mapping failed.',
-          detail: error instanceof Error ? error.message : 'unknown_error',
-        },
-        500,
-        corsHeaders,
-      )
+      return internalErrorResponse(corsHeaders)
     }
 
     const runpodInput: Record<string, unknown> = {
@@ -707,10 +697,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     if (multiAngleEnabled && isMissingMultiAngleLoraError(parsed)) {
       return jsonResponse(
         {
-          error: 'MultiAngle LoRA is enabled but not available on the worker.',
-          detail:
-            "qwen-image-edit-2511-multiple-angles-lora.safetensors not found in ComfyUI loras list.",
-          hint: 'Check RunPod worker image/volume so /comfyui/models/loras contains the LoRA.',
+          error: 'エラーです。やり直してください。',
         },
         503,
         corsHeaders,
@@ -722,7 +709,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return jsonResponse(
         {
           error: '画像サイズが大きすぎます',
-          detail: upstreamError || 'out_of_memory',
         },
         502,
         corsHeaders,
@@ -772,14 +758,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
     return jsonResponse(parsed, upstream.status, corsHeaders)
   } catch (error) {
-    return jsonResponse(
-      {
-        error: 'Qwen request failed.',
-        detail: error instanceof Error ? error.message : 'unknown_error',
-      },
-      502,
-      corsHeaders,
-    )
+    return jsonResponse({ error: 'Qwen request failed.' }, 502, corsHeaders)
   }
 }
 

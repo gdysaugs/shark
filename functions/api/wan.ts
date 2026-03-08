@@ -26,6 +26,10 @@ const jsonResponse = (body: unknown, status = 200, headers: HeadersInit = {}) =>
     headers: { ...headers, 'Content-Type': 'application/json' },
   })
 
+const INTERNAL_ERROR_MESSAGE = 'エラーです。やり直してください。'
+const internalErrorResponse = (corsHeaders: HeadersInit) =>
+  jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 500, corsHeaders)
+
 const resolveEndpoint = (env: Env) =>
   (env.RUNPOD_WAN_ENDPOINT_URL ?? env.RUNPOD_ENDPOINT_URL)?.replace(/\/$/, '')
 
@@ -206,7 +210,7 @@ const ensureTicketAvailable = async (
   const { data: existing, error } = await ensureTicketRow(admin, user)
 
   if (error) {
-    return { response: jsonResponse({ error: error.message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
 
   if (!existing) {
@@ -241,7 +245,7 @@ const consumeTicket = async (
   const { data: existing, error } = await fetchTicketRow(admin, user)
 
   if (error) {
-    return { response: jsonResponse({ error: error.message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
 
   if (!existing) {
@@ -269,7 +273,7 @@ const consumeTicket = async (
     if (message.includes('INVALID')) {
       return { response: jsonResponse({ error: 'Invalid ticket request.' }, 400, corsHeaders) }
     }
-    return { response: jsonResponse({ error: message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
 
   const result = Array.isArray(rpcData) ? rpcData[0] : rpcData
@@ -302,7 +306,7 @@ const refundTicket = async (
     .maybeSingle()
 
   if (chargeError) {
-    return { response: jsonResponse({ error: chargeError.message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
 
   const chargeUserId = chargeEvent?.user_id ? String(chargeEvent.user_id) : ''
@@ -321,7 +325,7 @@ const refundTicket = async (
     .maybeSingle()
 
   if (refundCheckError) {
-    return { response: jsonResponse({ error: refundCheckError.message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
 
   if (existingRefund) {
@@ -331,7 +335,7 @@ const refundTicket = async (
   const { data: existing, error } = await ensureTicketRow(admin, user)
 
   if (error) {
-    return { response: jsonResponse({ error: error.message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
 
   if (!existing) {
@@ -355,7 +359,7 @@ const refundTicket = async (
     if (message.includes('INVALID')) {
       return { response: jsonResponse({ error: 'Invalid ticket request.' }, 400, corsHeaders) }
     }
-    return { response: jsonResponse({ error: message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
 
   const result = Array.isArray(rpcData) ? rpcData[0] : rpcData
@@ -380,7 +384,7 @@ const ensureUsageOwnership = async (
     .maybeSingle()
 
   if (chargeError) {
-    return { response: jsonResponse({ error: chargeError.message }, 500, corsHeaders) }
+    return { response: internalErrorResponse(corsHeaders) }
   }
   if (!chargeEvent) {
     return { response: jsonResponse({ error: 'Job not found.' }, 404, corsHeaders) }
@@ -685,7 +689,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       }
     } catch (error) {
       return jsonResponse(
-        { error: error instanceof Error ? error.message : 'Age verification failed.' },
+        { error: 'Age verification failed.' },
         500,
         corsHeaders,
       )

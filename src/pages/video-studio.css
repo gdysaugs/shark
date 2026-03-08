@@ -253,6 +253,30 @@
   flex: 1;
 }
 
+.studio-ticket-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.studio-ticket-actions .studio-buy-button,
+.studio-ticket-actions .studio-sparkmotion-button {
+  width: fit-content;
+  min-width: 168px;
+  justify-content: center;
+}
+
+.studio-sparkmotion-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
 .studio-account {
   border: 1px solid #e5e7eb;
   background: #f8fafc;
@@ -939,6 +963,15 @@
   }
 
   .studio-buy-button {
+    width: 100%;
+  }
+
+  .studio-ticket-actions {
+    width: 100%;
+  }
+
+  .studio-ticket-actions .studio-buy-button,
+  .studio-ticket-actions .studio-sparkmotion-button {
     width: 100%;
   }
 }

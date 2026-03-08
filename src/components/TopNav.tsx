@@ -12,7 +12,7 @@ export function TopNav() {
   return (
     <header className='top-nav'>
       <div className='top-nav__brand'>
-        <span className='top-nav__title'>SparkMotion</span>
+        <span className='top-nav__title'>Spark Art</span>
       </div>
       <button
         type='button'

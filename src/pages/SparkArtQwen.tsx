@@ -11,6 +11,7 @@ const CFG_MAX = 2
 const CFG_STEP = 0.1
 const PROMPT_MAX_LENGTH = 1000
 const PROMPT_PLACEHOLDER = '例: 女が両手で胸を揉む'
+const SPARKMOTION_URL = 'https://sparkmotion.work/'
 type GenerationMode = 'i2v' | 'qwen_edit'
 type MultiAngleOption = {
   key: string
@@ -346,11 +347,6 @@ export function SparkArtQwen({
     () => MULTIANGLE_DISTANCE_OPTIONS.find((option) => option.key === distanceKey) ?? MULTIANGLE_DISTANCE_OPTIONS[1],
     [distanceKey],
   )
-  const multiAngleTag = useMemo(
-    () => `<sks> ${selectedAzimuth.prompt} ${selectedElevation.prompt} ${selectedDistance.prompt}`,
-    [selectedAzimuth, selectedElevation, selectedDistance],
-  )
-
   const handleSourceChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const inputEl = event.target
     const file = inputEl.files?.[0]
@@ -489,15 +485,12 @@ export function SparkArtQwen({
         refImages.push(sourceBase64)
       }
       const promptText = prompt.trim()
-      const hasSksToken = /<sks>/i.test(promptText)
-      const finalPrompt =
-        multiAngleEnabled && !hasSksToken ? [multiAngleTag, promptText].filter(Boolean).join('\n') : promptText
       const body = {
         input: {
           variant: 'qwen_edit',
           worker_mode: 'comfyui',
           mode: 'comfyui',
-          prompt: finalPrompt,
+          prompt: promptText,
           negative_prompt: negativePrompt,
           multiangle_enabled: multiAngleEnabled,
           multiangle_azimuth: selectedAzimuth.prompt,
@@ -627,9 +620,14 @@ export function SparkArtQwen({
             {ticketStatus !== 'loading' && `保有コイン数 ${ticketCount ?? 0}枚`}
             {ticketStatus === 'error' && ticketMessage ? ` / ${ticketMessage}` : ''}
           </div>
-          <button type='button' className='ghost-button studio-buy-button' onClick={onOpenPurchaseConfirm}>
-            コインを購入する
-          </button>
+          <div className='studio-ticket-actions'>
+            <button type='button' className='ghost-button studio-buy-button' onClick={onOpenPurchaseConfirm}>
+              コインを購入する
+            </button>
+            <a className='ghost-button studio-sparkmotion-button' href={SPARKMOTION_URL} target='_blank' rel='noreferrer'>
+              SparkMotionを使う
+            </a>
+          </div>
         </div>
 
         <div className='sa-upload-grid'>
@@ -780,10 +778,6 @@ export function SparkArtQwen({
                 </select>
               </div>
 
-              <div className='sa-angle-preview'>
-                <strong>自動追加タグ</strong>
-                <code>{multiAngleTag}</code>
-              </div>
             </>
           ) : (
             <small className='sa-input-meta'>OFF時は通常のEdit生成になります。</small>

@@ -7,37 +7,50 @@
 import './guest-intro.css'
 
 const ASSETS = {
-  upload: '/media/guest-step-upload.webp?v=20260301-1',
-  output: '/media/guest-step-length.mp4?v=20260301-1',
+  upload: '/media/guest-step-upload.avif?v=20260307-1',
+  output: '/media/guest-step-length-14.mp4?v=20260307-1',
 }
 
 const EDIT_SHOWCASE = {
-  main: '/media/sparkart-edit-main.avif?v=20260302-1',
-  reference: '/media/sparkart-edit-reference.avif?v=20260302-1',
-  result: '/media/sparkart-edit-result.png?v=20260302-1',
+  main: '/media/sparkart-edit-main-20260307.avif?v=20260307-1',
+  reference: '/media/sparkart-edit-reference-20260307.webp?v=20260307-1',
+  result: '/media/sparkart-edit-result-20260307.png?v=20260307-1',
 }
 
-const EDIT_SHOWCASE_PROMPT = 'メイン画像の女と参考画像の女が抱き合う'
+const EDIT_SHOWCASE_PROMPT = 'メイン画像の女と参考画像の女がキス'
+const EDIT_SHOWCASE_ANGLE = 'アングル　上30度　中距離'
+const GALLERY_ITEMS = [
+  {
+    src: '/media/sparkart-gallery-angle-down30.png?v=20260307-1',
+    label: 'アングル下30度の例',
+    alt: 'アングル下30度の生成例',
+  },
+  {
+    src: '/media/sparkart-gallery-combo.png?v=20260307-1',
+    label: '別の画像と組み合わせた例',
+    alt: '別の画像と組み合わせた生成例',
+  },
+]
 
 const HERO_ORBIT_VIDEOS = [
-  '/media/hero-orbit-1.mp4?v=20260301-1',
-  '/media/hero-orbit-2.mp4?v=20260301-1',
-  '/media/hero-orbit-3.mp4?v=20260301-1',
-  '/media/hero-orbit-4.mp4?v=20260301-1',
-  '/media/hero-orbit-5.mp4?v=20260301-1',
-  '/media/hero-orbit-6.mp4?v=20260301-2',
-  '/media/hero-orbit-7.mp4?v=20260301-1',
-  '/media/hero-orbit-8.mp4?v=20260301-1',
+  '/media/sparkart-orbit-19.mp4?v=20260307-4',
+  '/media/sparkart-orbit-18.mp4?v=20260307-4',
+  '/media/sparkart-orbit-16.mp4?v=20260307-4',
+  '/media/sparkart-orbit-15.mp4?v=20260307-4',
+  '/media/sparkart-orbit-14.mp4?v=20260307-4',
+  '/media/sparkart-orbit-13.mp4?v=20260307-4',
+  '/media/sparkart-orbit-12.mp4?v=20260307-4',
+  '/media/sparkart-orbit-11.mp4?v=20260307-4',
 ]
 
 const ENGINE_FEATURES = [
   {
-    name: 'Spark',
-    description: 'プロンプトに忠実で、破綻が少ない安定した生成。まずはこちらがおすすめです。',
+    name: 'SparkMotion',
+    description: '動画生成、画像編集が可能なSparkArtのベースモデルサイト。安定した生成が特徴です。',
   },
   {
-    name: 'NeoSpark V9',
-    description: 'DaSiWa Lightspeed High/Low (V9) ベース。大胆で予想外の動きが出やすく、表現の幅が広い一方で、破綻は増えやすくなります。',
+    name: 'SparkArt',
+    description: 'SparkMotionを改良した新モデルを搭載したサイト。動きの多さが特徴です。',
   },
 ]
 
@@ -97,10 +110,10 @@ export function GuestIntro({ mode: _mode, onSignIn, onEmailLogin }: GuestIntroPr
       <section className='nova-hero nova-hero--fullbleed'>
         <div className='nova-hero__inner'>
           <div className='nova-hero__copy'>
-            <h1>Spark Motion</h1>
+            <h1>Spark Art</h1>
             <p>
-              動画生成に特化したシンプルなスタジオです。
-              1枚の画像をもとに、6秒の動画をすぐ作成できます。
+              動画画像生成に特化したAIスタジオです。
+              1枚の画像をもとに、6秒の動画やアングル違いの画像をすぐ作成できます。
             </p>
             <div className='nova-auth-buttons'>
               <button type='button' className='primary-button primary-button--glow primary-button--pink' onClick={onSignIn}>
@@ -121,14 +134,11 @@ export function GuestIntro({ mode: _mode, onSignIn, onEmailLogin }: GuestIntroPr
           <div className='nova-hero__visual'>
             <div className='nova-object' aria-hidden='true'>
               <div className='nova-ring'>
-                {HERO_ORBIT_VIDEOS.map((src) => (
-                  <div key={src} className='nova-face'>
+                {HERO_ORBIT_VIDEOS.map((src, faceIndex) => (
+                  <div key={`orbit-face-${faceIndex}-${src}`} className='nova-face'>
                     <video src={src} autoPlay loop muted playsInline preload='metadata' />
                   </div>
                 ))}
-              </div>
-              <div className='nova-core'>
-                <span>SparkMotion</span>
               </div>
             </div>
           </div>
@@ -164,11 +174,12 @@ export function GuestIntro({ mode: _mode, onSignIn, onEmailLogin }: GuestIntroPr
           <p className='sparkart-edit-promo__kicker'>圧倒的な画像編集機能</p>
           <h2>1枚または2枚の画像と1行の指示で、狙った編集結果を一発生成</h2>
           <p>
-            SparkMotionのImage Editは、メイン画像と参考画像の特徴を保ちながら、プロンプトどおりの構図へ強力に変換します。
+            Spark ArtのImage Editは、メイン画像と参考画像の特徴を保ちながら、プロンプトどおりの構図へ強力に変換します。さらにアングルやショットも自由自在に変更可能です。
           </p>
           <div className='sparkart-edit-promo__prompt'>
             <span>実際の入力プロンプト</span>
             <strong>{EDIT_SHOWCASE_PROMPT}</strong>
+            <p className='sparkart-edit-promo__shot'>{EDIT_SHOWCASE_ANGLE}</p>
           </div>
         </div>
 
@@ -188,10 +199,29 @@ export function GuestIntro({ mode: _mode, onSignIn, onEmailLogin }: GuestIntroPr
         </div>
       </section>
 
+      <section className='sparkart-gallery'>
+        <div className='sparkart-gallery__head'>
+          <p>GALLERY</p>
+          <h2>生成ギャラリー</h2>
+        </div>
+        <div className='sparkart-gallery__grid'>
+          {GALLERY_ITEMS.map((item) => (
+            <figure key={item.label} className='sparkart-gallery__card'>
+              <img src={item.src} alt={item.alt} loading='lazy' />
+              <figcaption>{item.label}</figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
       <section className='pulse-faq'>
         <div className='pulse-faq__head'>
-          <h2>SparkMotionでできること</h2>
-          <p>Spark / NeoSpark V9 の2つの動画スタイルを用途に合わせて使い分けできます。</p>
+          <h2>Spark Artでできること</h2>
+          <p>
+            動き重視または安定重視で2つの動画スタイルを用途に合わせて使い分けできます。
+            <br />
+            SparkArtの動画エンジンはSparkMotionの動画エンジンに改良を加えた独自モデルです。
+          </p>
         </div>
         <div className='pulse-faq__grid'>
           {ENGINE_FEATURES.map((item) => (
@@ -201,6 +231,34 @@ export function GuestIntro({ mode: _mode, onSignIn, onEmailLogin }: GuestIntroPr
             </article>
           ))}
         </div>
+      </section>
+
+      <section className='sparkart-qa'>
+        <div className='sparkart-qa__head'>
+          <p>SparkMotion / SparkArt</p>
+          <h2>Q&A</h2>
+        </div>
+
+        <div className='sparkart-qa__bubble sparkart-qa__bubble--q'>
+          <span>Q</span>
+          <p>SparkArtとSparkMotionの大きな違いは何ですか？</p>
+        </div>
+
+        <div className='sparkart-qa__bubble sparkart-qa__bubble--a'>
+          <span>A</span>
+          <p>
+            どちらもそれぞれ特徴があります。SparkMotionは動画の安定感に強みがあり、SparkArtはより多機能なモデルで自由度が高いです。
+          </p>
+        </div>
+
+        <a
+          className='sparkart-qa__link'
+          href='https://sparkmotion.work/'
+          target='_blank'
+          rel='noreferrer'
+        >
+          SparkMotionを見る
+        </a>
       </section>
 
       <section className='pulse-faq'>
@@ -259,6 +317,5 @@ export function GuestIntro({ mode: _mode, onSignIn, onEmailLogin }: GuestIntroPr
     </div>
   )
 }
-
 
 

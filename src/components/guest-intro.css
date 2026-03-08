@@ -63,6 +63,13 @@
   font-size: 0.95rem;
 }
 
+.sparkart-edit-promo__shot {
+  margin: 0;
+  color: #a8bed4;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
 .sparkart-edit-promo__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -101,6 +108,172 @@
   box-shadow: 0 0 0 1px rgba(103, 232, 249, 0.35), 0 10px 18px rgba(14, 165, 233, 0.2);
 }
 
+.sparkart-gallery {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 10% 16%, rgba(99, 102, 241, 0.14), transparent 42%),
+    radial-gradient(circle at 88% 84%, rgba(56, 189, 248, 0.12), transparent 44%),
+    linear-gradient(160deg, rgba(9, 14, 28, 0.96), rgba(7, 10, 22, 0.97));
+  box-shadow: 0 12px 26px rgba(2, 8, 20, 0.46);
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.sparkart-gallery__head {
+  display: grid;
+  gap: 6px;
+}
+
+.sparkart-gallery__head p {
+  margin: 0;
+  font-size: 0.76rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: #67e8f9;
+}
+
+.sparkart-gallery__head h2 {
+  margin: 0;
+  color: #e6edf7;
+  font-size: clamp(1.2rem, 2vw, 1.65rem);
+  line-height: 1.2;
+  font-family: 'DM Serif Display', 'Noto Serif JP', serif;
+}
+
+.sparkart-gallery__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sparkart-gallery__card {
+  margin: 0;
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  border-radius: 15px;
+  overflow: hidden;
+  background: #0b1426;
+}
+
+.sparkart-gallery__card img {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: #091426;
+}
+
+.sparkart-gallery__card figcaption {
+  padding: 9px 10px;
+  text-align: center;
+  color: #dbe9f8;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.sparkart-qa {
+  border: 1px solid rgba(103, 232, 249, 0.3);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 16% 12%, rgba(56, 189, 248, 0.16), transparent 40%),
+    radial-gradient(circle at 84% 88%, rgba(99, 102, 241, 0.14), transparent 42%),
+    linear-gradient(160deg, rgba(10, 16, 32, 0.96), rgba(7, 11, 24, 0.97));
+  box-shadow: 0 12px 24px rgba(2, 10, 24, 0.46);
+  padding: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.sparkart-qa__head {
+  display: grid;
+  gap: 6px;
+}
+
+.sparkart-qa__head p {
+  margin: 0;
+  font-size: 0.76rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: #67e8f9;
+}
+
+.sparkart-qa__head h2 {
+  margin: 0;
+  color: #e6edf7;
+  font-size: clamp(1.15rem, 2vw, 1.55rem);
+  line-height: 1.2;
+  font-family: 'DM Serif Display', 'Noto Serif JP', serif;
+}
+
+.sparkart-qa__bubble {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  padding: 11px 12px;
+}
+
+.sparkart-qa__bubble span {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.sparkart-qa__bubble p {
+  margin: 0;
+  color: #d7e6f5;
+  font-size: 0.9rem;
+  line-height: 1.68;
+}
+
+.sparkart-qa__bubble--q {
+  background: rgba(11, 20, 37, 0.92);
+}
+
+.sparkart-qa__bubble--q span {
+  background: rgba(56, 189, 248, 0.2);
+  color: #67e8f9;
+}
+
+.sparkart-qa__bubble--a {
+  background: rgba(15, 20, 40, 0.92);
+}
+
+.sparkart-qa__bubble--a span {
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+}
+
+.sparkart-qa__link {
+  justify-self: start;
+  border-radius: 999px;
+  border: 1px solid rgba(103, 232, 249, 0.45);
+  background: rgba(8, 22, 36, 0.9);
+  color: #67e8f9;
+  text-decoration: none;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 8px 12px;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.sparkart-qa__link:hover {
+  transform: translateY(-1px);
+  border-color: rgba(103, 232, 249, 0.72);
+  background: rgba(12, 30, 46, 0.92);
+}
+
 @media (max-width: 900px) {
   .sparkart-edit-promo {
     padding: 16px;
@@ -110,5 +283,19 @@
 
   .sparkart-edit-promo__grid {
     grid-template-columns: 1fr;
+  }
+
+  .sparkart-gallery {
+    padding: 16px;
+    border-radius: 22px;
+  }
+
+  .sparkart-gallery__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sparkart-qa {
+    padding: 15px;
+    border-radius: 20px;
   }
 }
