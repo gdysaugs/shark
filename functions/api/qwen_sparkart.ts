@@ -414,6 +414,30 @@ const toInt = (value: unknown, fallback: number) => {
   return Number.isFinite(n) ? Math.floor(n) : fallback
 }
 
+const toPromptToken = (value: unknown) => {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  return trimmed
+}
+
+const buildPromptWithMultiAngle = (
+  basePrompt: string,
+  input: Record<string, unknown>,
+  enabled: boolean,
+) => {
+  const prompt = basePrompt.trim()
+  if (!enabled) return prompt
+
+  const azimuth = toPromptToken(input.multiangle_azimuth)
+  const elevation = toPromptToken(input.multiangle_elevation)
+  const distance = toPromptToken(input.multiangle_distance) || 'medium shot'
+  const angleParts = [azimuth, elevation, distance].filter(Boolean)
+
+  if (!angleParts.length) return prompt
+  const angleTag = `<sks> ${angleParts.join(', ')}`
+  return [prompt, angleTag].filter(Boolean).join(', ')
+}
+
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n))
 
 const setNodeInput = (workflow: Record<string, any>, nodeId: string, inputKey: string, value: unknown) => {
@@ -572,7 +596,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
     const input = (payload.input ?? payload) as Record<string, unknown>
     const multiAngleEnabled = Boolean(input.multiangle_enabled ?? input.multiangle ?? false)
-    const prompt = String(input.prompt ?? input.text ?? '')
+    const basePrompt = String(input.prompt ?? input.text ?? '')
+    const prompt = buildPromptWithMultiAngle(basePrompt, input, multiAngleEnabled)
     const negativePrompt = String(input.negative_prompt ?? input.negative ?? '')
     const promptIsEmpty = prompt.trim().length === 0
     if (prompt.length > MAX_PROMPT_LENGTH) {
