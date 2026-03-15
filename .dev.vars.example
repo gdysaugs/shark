@@ -1,0 +1,15 @@
+RUNPOD_SOVITS_ENDPOINT_URL=https://api.runpod.ai/v2/your-sovits-endpoint-id
+RUNPOD_LIPSYNC_ENDPOINT_URL=https://api.runpod.ai/v2/your-wav2lip-endpoint-id
+RUNPOD_W2L_ENDPOINT_URL=https://api.runpod.ai/v2/your-wav2lip-endpoint-id
+RUNPOD_WAN_RAPID_FASTMOVE_ENDPOINT_URL=https://api.runpod.ai/v2/your-fastmove-endpoint-id
+RUNPOD_WAN_SMOOTHMIX_ENDPOINT_URL=https://api.runpod.ai/v2/your-smoothmix-endpoint-id
+SOVITS_REF_AUDIO_URL=https://<your-public-r2-domain>/sovits_ref/oneesan.wav
+SOVITS_FRAGMENT_INTERVAL=0.08
+SOVITS_SPEED_FACTOR=1.0
+
+# Required separately (do not commit real values):
+# RUNPOD_API_KEY=
+# RUNPOD_SOVITS_API_KEY=
+# RUNPOD_LIPSYNC_API_KEY=
+# SUPABASE_URL=
+# SUPABASE_SERVICE_ROLE_KEY=

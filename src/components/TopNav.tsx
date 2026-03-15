@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 
 export function TopNav() {
@@ -12,7 +12,7 @@ export function TopNav() {
   return (
     <header className='top-nav'>
       <div className='top-nav__brand'>
-        <span className='top-nav__title'>Spark Art</span>
+        <span className='top-nav__title'>SharkAI</span>
       </div>
       <button
         type='button'
@@ -31,8 +31,16 @@ export function TopNav() {
           動画生成
         </NavLink>
         <NavLink to='/purchase' className={({ isActive }) => `top-nav__link${isActive ? ' is-active' : ''}`}>
-          コイン
+          トークン
         </NavLink>
+        <a
+          href='https://gettoken.uk/purchage/'
+          className='top-nav__link'
+          target='_blank'
+          rel='noopener noreferrer'
+        >
+          ショップ
+        </a>
       </nav>
     </header>
   )

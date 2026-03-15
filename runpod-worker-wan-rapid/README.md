@@ -25,7 +25,7 @@ The rapid API workflow applies Lightx2v LoRA automatically with:
 ## Build
 
 ```bash
-cd /home/adama/sparkart/runpod-worker-wan-rapid
+cd /home/adama/Shark/runpod-worker-wan-rapid
 docker build -t suarez123/wan22-tastysin-v8-i2v:smoothmix-v20-i2v-sft .
 ```
 

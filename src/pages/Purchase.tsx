@@ -1,12 +1,13 @@
-﻿import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { isAuthConfigured, signOutSafely, supabase } from '../lib/supabaseClient'
+import { ensureAuthConfigured, isAuthConfigured, signOutSafely, supabase } from '../lib/supabaseClient'
 import { PURCHASE_PLANS } from '../lib/purchasePlans'
 import { getOAuthRedirectUrl } from '../lib/oauthRedirect'
 import { TopNav } from '../components/TopNav'
 import './camera.css'
 
 const OAUTH_REDIRECT_URL = getOAuthRedirectUrl()
+const DAILY_BONUS_DISPLAY_AMOUNT = 3
 
 export function Purchase() {
   const [session, setSession] = useState<Session | null>(null)
@@ -78,7 +79,7 @@ export function Purchase() {
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
       setTicketStatus('error')
-      setTicketMessage(data?.error || 'コイン取得に失敗しました。')
+      setTicketMessage(data?.error || 'トークン取得に失敗しました。')
       setTicketCount(null)
       return
     }
@@ -121,7 +122,8 @@ export function Purchase() {
   }, [accessToken, fetchDailyBonus, fetchTickets, session])
 
   const handleGoogleSignIn = async () => {
-    if (!supabase || !isAuthConfigured) {
+    const authReady = await ensureAuthConfigured()
+    if (!authReady || !supabase || !isAuthConfigured) {
       setAuthStatus('error')
       setAuthMessage('認証設定が未完了です。')
       return
@@ -223,7 +225,11 @@ export function Purchase() {
         await fetchTickets(accessToken)
       }
       setBonusStatus('idle')
-      setBonusMessage('ログインボーナスを受け取りました。（+15）')
+      const awardedRaw = Number(data?.awarded)
+      const awarded = Number.isFinite(awardedRaw)
+        ? Math.max(1, Math.floor(awardedRaw))
+        : DAILY_BONUS_DISPLAY_AMOUNT
+      setBonusMessage(`ログインボーナスを受け取りました。+${awarded}トークン`)
     } else {
       setBonusStatus('idle')
       setBonusMessage(
@@ -271,13 +277,13 @@ export function Purchase() {
           {session && (
             <>
               <div className="ticket-message">
-                {ticketStatus === 'loading' && 'コイン確認中...'}
-                {ticketStatus !== 'loading' && `あなたの残りコイン保有数${ticketCount ?? 0}枚`}
+                {ticketStatus === 'loading' && 'トークン確認中...'}
+                {ticketStatus !== 'loading' && `あなたの残りトークン保有数${ticketCount ?? 0}枚`}
                 {ticketStatus === 'error' && ticketMessage ? ` / ${ticketMessage}` : ''}
               </div>
               <div className="daily-bonus">
                 <div className="daily-bonus__meta">
-                  <strong>ログインボーナス（+15）</strong>
+                  <strong>{`ログインボーナス（+${DAILY_BONUS_DISPLAY_AMOUNT}）`}</strong>
                   {bonusStatus === 'loading' && <span>状態を確認中...</span>}
                   {bonusStatus !== 'loading' && bonusCanClaim && <span>今すぐ受け取れます</span>}
                   {bonusStatus !== 'loading' && !bonusCanClaim && bonusNextEligibleAt && (
@@ -301,7 +307,7 @@ export function Purchase() {
         <section className="purchase-panel">
           <div className="panel-header">
             <div className="panel-title">
-              <h2>コイン購入</h2>
+              <h2>トークン購入</h2>
               <span>好きなパックを購入。</span>
             </div>
           </div>
@@ -310,7 +316,7 @@ export function Purchase() {
               <div key={plan.id} className="plan-card">
                 <div>
                   <div className="plan-label">{plan.label}</div>
-                  <div className="plan-tickets">{plan.tickets} コイン</div>
+                  <div className="plan-tickets">{plan.tickets} トークン</div>
                 </div>
                 <div className="plan-price">¥{plan.price.toLocaleString()}</div>
                 <button

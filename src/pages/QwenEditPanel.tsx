@@ -1,7 +1,7 @@
 import { useMemo, useState, type ChangeEvent } from 'react'
-import './sparkart-qwen.css'
+import './qwen-edit-panel.css'
 
-const API_ENDPOINT = '/api/qwen_sparkart'
+const API_ENDPOINT = '/api/qwen_edit'
 const REF_COUNT = 1
 const PREPROCESS_MAX_SIZE = 1024
 const DEFAULT_DIMENSION = 1024
@@ -10,41 +10,15 @@ const CFG_MIN = 0.1
 const CFG_MAX = 2
 const CFG_STEP = 0.1
 const PROMPT_MAX_LENGTH = 1000
-const PROMPT_PLACEHOLDER = '例: 女が両手で胸を揉む'
-const SPARKMOTION_URL = 'https://sparkmotion.work/'
+const PROMPT_PLACEHOLDER = '指示を入力'
+const EDIT_SOURCE_INPUT_ID = 'edit-base-image-file'
 type GenerationMode = 'i2v' | 'qwen_edit'
-type MultiAngleOption = {
-  key: string
-  label: string
-  prompt: string
-}
 
-const MULTIANGLE_AZIMUTH_OPTIONS: readonly MultiAngleOption[] = [
-  { key: 'front', label: '前 (0°)', prompt: 'front view' },
-  { key: 'front_right', label: '右前 (45°)', prompt: 'front-right quarter view' },
-  { key: 'right', label: '右 (90°)', prompt: 'right side view' },
-  { key: 'back_right', label: '右後 (135°)', prompt: 'back-right quarter view' },
-  { key: 'back', label: '後 (180°)', prompt: 'back view' },
-  { key: 'back_left', label: '左後 (225°)', prompt: 'back-left quarter view' },
-  { key: 'left', label: '左 (270°)', prompt: 'left side view' },
-  { key: 'front_left', label: '左前 (315°)', prompt: 'front-left quarter view' },
-] as const
-const MULTIANGLE_ELEVATION_OPTIONS: readonly MultiAngleOption[] = [
-  { key: 'low', label: '下から (-30°)', prompt: 'low-angle shot' },
-  { key: 'eye', label: '目線 (0°)', prompt: 'eye-level shot' },
-  { key: 'elevated', label: 'やや上 (+30°)', prompt: 'elevated shot' },
-  { key: 'high', label: '高い位置 (+60°)', prompt: 'high-angle shot' },
-] as const
-
-const MULTIANGLE_DISTANCE_OPTIONS: readonly MultiAngleOption[] = [
-  { key: 'close', label: '寄り', prompt: 'close-up' },
-  { key: 'medium', label: '中距離', prompt: 'medium shot' },
-  { key: 'wide', label: '引き', prompt: 'wide shot' },
-] as const
-
-type SparkArtQwenProps = {
+type QwenEditPanelProps = {
   generationMode: GenerationMode
   onChangeMode: (mode: GenerationMode) => void
+  onOpenFastMove: () => void
+  onOpenLipSync: () => void
   accessToken: string
   selectedTicketCost: number
   ticketStatus: 'idle' | 'loading' | 'error'
@@ -177,7 +151,7 @@ const isTicketShortage = (status: number, message: string) => {
     lowered.includes('insufficient_tickets') ||
     lowered.includes('insufficient tickets') ||
     lowered.includes('token不足') ||
-    lowered.includes('コイン') ||
+    lowered.includes('トークン') ||
     lowered.includes('token') ||
     lowered.includes('credit')
   )
@@ -288,9 +262,11 @@ const dataUrlToBlob = (dataUrl: string, fallbackMime: string) => {
   return base64ToBlob(base64, mime)
 }
 
-export function SparkArtQwen({
+export function QwenEditPanel({
   generationMode,
   onChangeMode,
+  onOpenFastMove,
+  onOpenLipSync,
   accessToken,
   selectedTicketCost,
   ticketStatus,
@@ -309,7 +285,7 @@ export function SparkArtQwen({
   onEnsureTickets,
   onTicketShortage,
   onTicketCountUpdate,
-}: SparkArtQwenProps) {
+}: QwenEditPanelProps) {
   const [sourceName, setSourceName] = useState('')
   const [sourceData, setSourceData] = useState('')
   const [references, setReferences] = useState<RefImage[]>(
@@ -317,10 +293,6 @@ export function SparkArtQwen({
   )
   const [prompt, setPrompt] = useState('')
   const [negativePrompt, setNegativePrompt] = useState('')
-  const [multiAngleEnabled, setMultiAngleEnabled] = useState(false)
-  const [azimuthKey, setAzimuthKey] = useState(MULTIANGLE_AZIMUTH_OPTIONS[0]?.key ?? 'front')
-  const [elevationKey, setElevationKey] = useState(MULTIANGLE_ELEVATION_OPTIONS[1]?.key ?? 'eye')
-  const [distanceKey, setDistanceKey] = useState(MULTIANGLE_DISTANCE_OPTIONS[1]?.key ?? 'medium')
   const [cfg, setCfg] = useState(DEFAULT_CFG)
   const [width, setWidth] = useState(DEFAULT_DIMENSION)
   const [height, setHeight] = useState(DEFAULT_DIMENSION)
@@ -331,22 +303,7 @@ export function SparkArtQwen({
 
   const hasBaseImage = Boolean(sourceData)
   const hasPrompt = prompt.trim().length > 0
-  const canGenerate = useMemo(
-    () => hasBaseImage && (hasPrompt || multiAngleEnabled) && !isRunning,
-    [hasBaseImage, hasPrompt, multiAngleEnabled, isRunning],
-  )
-  const selectedAzimuth = useMemo(
-    () => MULTIANGLE_AZIMUTH_OPTIONS.find((option) => option.key === azimuthKey) ?? MULTIANGLE_AZIMUTH_OPTIONS[0],
-    [azimuthKey],
-  )
-  const selectedElevation = useMemo(
-    () => MULTIANGLE_ELEVATION_OPTIONS.find((option) => option.key === elevationKey) ?? MULTIANGLE_ELEVATION_OPTIONS[1],
-    [elevationKey],
-  )
-  const selectedDistance = useMemo(
-    () => MULTIANGLE_DISTANCE_OPTIONS.find((option) => option.key === distanceKey) ?? MULTIANGLE_DISTANCE_OPTIONS[1],
-    [distanceKey],
-  )
+  const canGenerate = useMemo(() => hasBaseImage && hasPrompt && !isRunning, [hasBaseImage, hasPrompt, isRunning])
   const handleSourceChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const inputEl = event.target
     const file = inputEl.files?.[0]
@@ -474,7 +431,7 @@ export function SparkArtQwen({
     try {
       const sourceBase64 = toBase64(sourceData)
       if (!sourceBase64) {
-        throw new Error('ベース画像は必須です。')
+        throw new Error('画像1は必須です。')
       }
       const refImages = references
         .map((item) => toBase64(item.data))
@@ -492,10 +449,6 @@ export function SparkArtQwen({
           mode: 'comfyui',
           prompt: promptText,
           negative_prompt: negativePrompt,
-          multiangle_enabled: multiAngleEnabled,
-          multiangle_azimuth: selectedAzimuth.prompt,
-          multiangle_elevation: selectedElevation.prompt,
-          multiangle_distance: selectedDistance.prompt,
           image_base64: primaryImage,
           reference_images: refImages,
           width: Number(width),
@@ -564,7 +517,7 @@ export function SparkArtQwen({
 
   const handleDownloadImage = async () => {
     if (!resultImage) return
-    const filename = `sparkart-edit-${Date.now()}.png`
+    const filename = `sharkai-edit-${Date.now()}.png`
     try {
       let blob: Blob
       if (resultImage.startsWith('data:')) {
@@ -589,77 +542,58 @@ export function SparkArtQwen({
   }
 
   return (
-    <main className='video-studio-layout sa-page sa-page--embedded'>
-      <section className='studio-block studio-block--input sa-form-card'>
-        <header className='studio-head studio-head--with-mode sa-editor-head'>
-          <div className='studio-head__copy'>
-            <h1>Edit</h1>
-            <p>ベース画像は必須です。参考画像は任意です。</p>
-          </div>
-          <div className='studio-mode-switch studio-mode-switch--inline' aria-label='Generation mode switch'>
-            <button
-              type='button'
-              className={`studio-mode-switch__btn${generationMode === 'i2v' ? ' is-active' : ''}`}
-              onClick={() => onChangeMode('i2v')}
-            >
-              Video
-            </button>
-            <button
-              type='button'
-              className={`studio-mode-switch__btn${generationMode === 'qwen_edit' ? ' is-active' : ''}`}
-              onClick={() => onChangeMode('qwen_edit')}
-            >
-              Edit
-            </button>
-          </div>
-        </header>
-
-        <div className='studio-ticket-row'>
-          <div className='studio-ticket'>
-            {ticketStatus === 'loading' && 'コイン確認中...'}
-            {ticketStatus !== 'loading' && `保有コイン数 ${ticketCount ?? 0}枚`}
-            {ticketStatus === 'error' && ticketMessage ? ` / ${ticketMessage}` : ''}
-          </div>
-          <div className='studio-ticket-actions'>
-            <button type='button' className='ghost-button studio-buy-button' onClick={onOpenPurchaseConfirm}>
-              コインを購入する
-            </button>
-            <a className='ghost-button studio-sparkmotion-button' href={SPARKMOTION_URL} target='_blank' rel='noreferrer'>
-              SparkMotionを使う
-            </a>
-          </div>
-        </div>
+    <main className='video-studio-layout fastmove-grid sa-page sa-page--embedded'>
+      <section className='studio-block--input fastmove-card sa-form-card'>
+        <h2>Edit</h2>
+        <p className='fastmove-status'>画像1は必須です。画像2は任意です。</p>
 
         <div className='sa-upload-grid'>
-          <label className='studio-upload sa-upload-card'>
-            <input type='file' accept='image/*' onChange={handleSourceChange} />
-            <div className='studio-upload__inner'>
-              <div className='studio-upload__icon' aria-hidden='true'>
-                +
-              </div>
-              <div className='studio-upload__text'>
-                <strong>{sourceName || 'ベース画像をアップロード'}</strong>
-                <span>ベース画像（必須）</span>
-              </div>
-              <span className='studio-upload__chip'>ベース</span>
-            </div>
-          </label>
-
-          {references.map((ref, index) => (
-            <label key={index} className='studio-upload sa-upload-card'>
-              <input type='file' accept='image/*' onChange={(event) => handleReferenceChange(index, event)} />
-              <div className='studio-upload__inner'>
-                <div className='studio-upload__icon' aria-hidden='true'>
-                  +
-                </div>
-                <div className='studio-upload__text'>
-                  <strong>{ref.name || '参考画像をアップロード'}</strong>
-                  <span>参考画像（任意）</span>
-                </div>
-                <span className='studio-upload__chip'>参考</span>
-              </div>
+          <div className='fastmove-field'>
+            <span>画像1（必須）</span>
+            <input
+              id={EDIT_SOURCE_INPUT_ID}
+              className='fastmove-file__native'
+              type='file'
+              accept='image/*'
+              onChange={handleSourceChange}
+              disabled={isRunning}
+            />
+            <label
+              htmlFor={EDIT_SOURCE_INPUT_ID}
+              className={`fastmove-file-picker ${sourceData ? 'is-selected' : ''} ${isRunning ? 'is-disabled' : ''}`.trim()}
+            >
+              <span className='fastmove-file-picker__badge'>画像1</span>
+              <span className='fastmove-file-picker__title'>{sourceName ? '画像1を変更' : '画像1を選択'}</span>
+              <span className='fastmove-file-picker__meta'>JPG / PNG / WEBP</span>
             </label>
-          ))}
+            <small>{sourceName || '画像を選択してください'}</small>
+          </div>
+
+          {references.map((ref, index) => {
+            const imageNumber = index + 2
+            return (
+            <div key={index} className='fastmove-field'>
+              <span>{`画像${imageNumber}（任意）`}</span>
+              <input
+                id={`edit-ref-image-file-${index}`}
+                className='fastmove-file__native'
+                type='file'
+                accept='image/*'
+                onChange={(event) => handleReferenceChange(index, event)}
+                disabled={isRunning}
+              />
+              <label
+                htmlFor={`edit-ref-image-file-${index}`}
+                className={`fastmove-file-picker ${ref.data ? 'is-selected' : ''} ${isRunning ? 'is-disabled' : ''}`.trim()}
+              >
+                <span className='fastmove-file-picker__badge'>{`画像${imageNumber}`}</span>
+                <span className='fastmove-file-picker__title'>{ref.name ? `画像${imageNumber}を変更` : `画像${imageNumber}を選択`}</span>
+                <span className='fastmove-file-picker__meta'>JPG / PNG / WEBP</span>
+              </label>
+              <small>{ref.name || '画像を選択してください'}</small>
+            </div>
+            )
+          })}
         </div>
 
         <div className='sa-preview-grid'>
@@ -676,29 +610,29 @@ export function SparkArtQwen({
               </button>
             </figure>
           ) : (
-            <div className='sa-empty-preview'>ベース画像プレビュー</div>
+            <div className='sa-empty-preview'>画像1プレビュー</div>
           )}
 
           {references.map((ref, index) =>
             ref.data ? (
               <figure key={index} className='studio-thumb'>
-                <img src={ref.data} alt={ref.name || `reference-${index + 1}`} />
+                <img src={ref.data} alt={ref.name || `image-${index + 2}`} />
                 <button
                   className='studio-thumb__remove'
                   type='button'
                   onClick={() => handleClearReference(index)}
-                  aria-label={`Remove reference ${index + 1}`}
+                  aria-label={`Remove image ${index + 2}`}
                 >
                   x
                 </button>
               </figure>
             ) : (
-              <div key={index} className='sa-empty-preview'>{`参考画像 ${index + 1} プレビュー`}</div>
+              <div key={index} className='sa-empty-preview'>{`画像${index + 2}プレビュー`}</div>
             ),
           )}
         </div>
 
-        <label className='studio-field'>
+        <label className='fastmove-field'>
           <span>プロンプト</span>
           <textarea
             rows={4}
@@ -710,81 +644,7 @@ export function SparkArtQwen({
           <small className='sa-input-meta'>{`${prompt.length}/${PROMPT_MAX_LENGTH}`}</small>
         </label>
 
-        <section className='sa-multiangle'>
-          <div className='studio-engine'>
-            <span className='studio-engine__label'>MultiAngle</span>
-            <label className='studio-switch'>
-              <input
-                type='checkbox'
-                checked={multiAngleEnabled}
-                onChange={(event) => setMultiAngleEnabled(event.target.checked)}
-                disabled={isRunning}
-              />
-              <span className='studio-switch__track' aria-hidden='true' />
-              <strong>{multiAngleEnabled ? 'ON' : 'OFF'}</strong>
-            </label>
-          </div>
-
-          {multiAngleEnabled ? (
-            <>
-              <div className='sa-angle-group'>
-                <span>水平方向（前後左右・45°刻み）</span>
-                <select
-                  className='sa-angle-select'
-                  value={azimuthKey}
-                  onChange={(event) => setAzimuthKey(event.target.value)}
-                  disabled={isRunning}
-                  aria-label='水平方向'
-                >
-                  {MULTIANGLE_AZIMUTH_OPTIONS.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className='sa-angle-group'>
-                <span>上下方向（-30° / 0° / +30° / +60°）</span>
-                <select
-                  className='sa-angle-select'
-                  value={elevationKey}
-                  onChange={(event) => setElevationKey(event.target.value)}
-                  disabled={isRunning}
-                  aria-label='上下方向'
-                >
-                  {MULTIANGLE_ELEVATION_OPTIONS.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className='sa-angle-group'>
-                <span>距離感</span>
-                <select
-                  className='sa-angle-select'
-                  value={distanceKey}
-                  onChange={(event) => setDistanceKey(event.target.value)}
-                  disabled={isRunning}
-                  aria-label='距離感'
-                >
-                  {MULTIANGLE_DISTANCE_OPTIONS.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-            </>
-          ) : (
-            <small className='sa-input-meta'>OFF時は通常のEdit生成になります。</small>
-          )}
-        </section>
-
-        <label className='studio-field studio-field--sub'>
+        <label className='fastmove-field'>
           <span>ネガティブプロンプト</span>
           <textarea
             rows={3}
@@ -794,8 +654,8 @@ export function SparkArtQwen({
           />
         </label>
 
-        <label className='studio-field studio-field--sub'>
-          <span>CFG</span>
+        <label className='fastmove-field fastmove-field--compact'>
+          <span>CFG(プロンプト優先度)</span>
           <input
             type='range'
             min={CFG_MIN}
@@ -806,81 +666,46 @@ export function SparkArtQwen({
             disabled={isRunning}
           />
           <small className='sa-input-meta'>{`現在: ${cfg.toFixed(1)}`}</small>
-          <small className='sa-input-meta'>CFGはプロンプトの効きやすさです。</small>
         </label>
 
-        <div className='studio-actions'>
-          <button className='primary-button' type='button' disabled={!canGenerate} onClick={handleGenerate}>
+        <div className='fastmove-actions'>
+          <button className='fastmove-primary' type='button' disabled={!canGenerate} onClick={handleGenerate}>
             {isRunning ? '生成中...' : '画像を生成'}
           </button>
-          <small>{`コイン消費: 1回につき${selectedTicketCost}コイン`}</small>
+          <small>{`トークン消費: 1回につき${selectedTicketCost}トークン`}</small>
         </div>
-
-        <section className='studio-credit-box'>
-          <header>
-            <h3>デイリーコイン</h3>
-            <span className={`studio-bonus-pill${bonusCanClaim ? ' is-ready' : ''}`}>
-              {bonusStatus === 'loading' && 'ステータス更新中'}
-              {bonusStatus !== 'loading' && bonusCanClaim && '今すぐ受け取り可能'}
-              {bonusStatus !== 'loading' &&
-                !bonusCanClaim &&
-                bonusNextEligibleAt &&
-                formatTimeUntilClaim(bonusNextEligibleAt)}
-            </span>
-          </header>
-          <div className={`studio-bonus-panel${bonusRouletteRolling ? ' is-rolling' : ''}`} aria-live='polite'>
-            <div className='studio-bonus-panel__icon'>COIN</div>
-            <div className='studio-bonus-panel__meta'>
-              <strong>{bonusRouletteRolling ? '付与処理中...' : '24時間ごとに1コインを受け取れます'}</strong>
-              <span>
-                {bonusCanClaim ? 'ログイン中なら毎日1回受け取れます' : '次回の受け取りまでクールタイムがあります'}
-              </span>
-              {bonusRouletteAwarded !== null && <span>今回の付与 +{bonusRouletteAwarded}コイン</span>}
-            </div>
-          </div>
-          <button
-            type='button'
-            className='primary-button'
-            onClick={onClaimDailyBonus}
-            disabled={bonusClaiming || bonusStatus === 'loading' || !bonusCanClaim}
-          >
-            {bonusClaiming ? 'コインを受け取り中...' : 'ログインボーナスを受け取る'}
-          </button>
-          {bonusMessage && <p className='studio-credit-msg'>{bonusMessage}</p>}
-        </section>
 
         <div className='sa-status-wrap'>
           {error ? <p className='sa-error'>{error}</p> : null}
         </div>
       </section>
 
-      <section className='studio-block studio-block--output sa-result-card'>
-        <header className='studio-output-head'>
+      <section className='studio-block--output fastmove-card sa-result-card'>
+        <header className='fastmove-output-head'>
           <div>
             <h2>生成結果</h2>
           </div>
           {resultImage ? (
-            <button type='button' className='ghost-button sa-download-btn' onClick={handleDownloadImage}>
+            <button type='button' className='fastmove-ghost sa-download-btn' onClick={handleDownloadImage}>
               Save
             </button>
           ) : null}
         </header>
 
-        <div className='studio-stage sa-edit-stage'>
+        <div className='fastmove-output sa-edit-stage'>
           {isRunning ? (
-            <div className='studio-loading' role='status' aria-live='polite'>
-              <div className='studio-loading__bars' aria-hidden='true'>
+            <div className='fastmove-loading' role='status' aria-live='polite'>
+              <div className='fastmove-loading__dots' aria-hidden='true'>
                 <span />
                 <span />
                 <span />
               </div>
-              <strong>生成中...</strong>
-              <p>1分前後かかる場合があります。</p>
+              <p>生成しています</p>
             </div>
           ) : resultImage ? (
             <img className='sa-result' src={resultImage} alt='result' />
           ) : (
-            <div className='studio-empty'>ベース画像とプロンプトを設定するとここに表示されます。</div>
+            <p>生成した画像がここに表示されます。</p>
           )}
         </div>
 
@@ -888,4 +713,3 @@ export function SparkArtQwen({
     </main>
   )
 }
-

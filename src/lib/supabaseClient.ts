@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { getRuntimePublicConfig } from './publicConfig'
 
 function normalizeEnvString(v: string | undefined): string {
@@ -20,12 +20,81 @@ function normalizeSupabaseUrl(v: string | undefined): string {
   }
 }
 
-const runtimeConfig = getRuntimePublicConfig()
-const supabaseUrl = normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL || runtimeConfig.VITE_SUPABASE_URL)
-const supabaseAnonKey = normalizeEnvString(import.meta.env.VITE_SUPABASE_ANON_KEY || runtimeConfig.VITE_SUPABASE_ANON_KEY)
+type PublicConfigPayload = {
+  VITE_SUPABASE_URL?: string
+  VITE_SUPABASE_ANON_KEY?: string
+}
 
-export const isAuthConfigured = Boolean(supabaseUrl && supabaseAnonKey)
-export const supabase = isAuthConfigured ? createClient(supabaseUrl, supabaseAnonKey) : null
+const readConfigCandidates = () => {
+  const runtimeConfig = getRuntimePublicConfig()
+  return {
+    url: normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL || runtimeConfig.VITE_SUPABASE_URL),
+    anonKey: normalizeEnvString(import.meta.env.VITE_SUPABASE_ANON_KEY || runtimeConfig.VITE_SUPABASE_ANON_KEY),
+  }
+}
+
+let supabaseUrl = ''
+let supabaseAnonKey = ''
+export let isAuthConfigured = false
+export let supabase: SupabaseClient | null = null
+let ensureAuthPromise: Promise<boolean> | null = null
+
+const applyConfig = (nextUrl: string, nextAnonKey: string) => {
+  const normalizedUrl = normalizeSupabaseUrl(nextUrl)
+  const normalizedAnonKey = normalizeEnvString(nextAnonKey)
+  const nextConfigured = Boolean(normalizedUrl && normalizedAnonKey)
+  const changed = normalizedUrl !== supabaseUrl || normalizedAnonKey !== supabaseAnonKey
+
+  supabaseUrl = normalizedUrl
+  supabaseAnonKey = normalizedAnonKey
+  isAuthConfigured = nextConfigured
+
+  if (!nextConfigured) {
+    supabase = null
+    return
+  }
+
+  if (!changed && supabase) return
+  supabase = createClient(supabaseUrl, supabaseAnonKey)
+}
+
+const mergeRuntimeConfig = (payload: PublicConfigPayload) => {
+  if (typeof window === 'undefined') return
+  window.__APP_CONFIG__ = Object.assign({}, window.__APP_CONFIG__, payload)
+}
+
+const loadRuntimePublicConfigFromApi = async () => {
+  if (typeof window === 'undefined') return
+  try {
+    const response = await fetch('/api/public_config', { cache: 'no-store' })
+    if (!response.ok) return
+    const payload = (await response.json()) as unknown
+    if (!payload || typeof payload !== 'object') return
+    mergeRuntimeConfig(payload as PublicConfigPayload)
+  } catch {
+    // Ignore transient network/runtime errors; caller handles fallback state.
+  }
+}
+
+const initial = readConfigCandidates()
+applyConfig(initial.url, initial.anonKey)
+
+export const ensureAuthConfigured = async () => {
+  if (isAuthConfigured && supabase) return true
+  if (typeof window === 'undefined') return false
+
+  if (ensureAuthPromise) return ensureAuthPromise
+  ensureAuthPromise = (async () => {
+    await loadRuntimePublicConfigFromApi()
+    const next = readConfigCandidates()
+    applyConfig(next.url, next.anonKey)
+    return Boolean(isAuthConfigured && supabase)
+  })().finally(() => {
+    ensureAuthPromise = null
+  })
+
+  return ensureAuthPromise
+}
 
 function getSupabaseProjectRef(url: string): string {
   if (!url) return ''

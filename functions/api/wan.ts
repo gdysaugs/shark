@@ -612,15 +612,27 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     }
   }
 
-  if (ticketsLeft !== null && payload && typeof payload === 'object' && !Array.isArray(payload)) {
-    payload.ticketsLeft = ticketsLeft
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    if (isFailureStatus(payload) || hasOutputError(payload) || !upstream.ok) {
+      const status = payload?.status ?? payload?.state ?? null
+      const body: Record<string, unknown> = {
+        id: extractJobId(payload) ?? id,
+        status,
+        state: status,
+        error: INTERNAL_ERROR_MESSAGE,
+      }
+      if (ticketsLeft !== null) {
+        body.ticketsLeft = ticketsLeft
+      }
+      return jsonResponse(body, upstream.status, corsHeaders)
+    }
+    if (ticketsLeft !== null) {
+      payload.ticketsLeft = ticketsLeft
+    }
     return jsonResponse(payload, upstream.status, corsHeaders)
   }
 
-  return new Response(raw, {
-    status: upstream.status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
+  return jsonResponse({ error: INTERNAL_ERROR_MESSAGE, id }, 502, corsHeaders)
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -844,14 +856,26 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
   }
 
-  if (ticketsLeft !== null && upstreamPayload && typeof upstreamPayload === 'object' && !Array.isArray(upstreamPayload)) {
-    upstreamPayload.ticketsLeft = ticketsLeft
+  if (upstreamPayload && typeof upstreamPayload === 'object' && !Array.isArray(upstreamPayload)) {
+    if (isFailureStatus(upstreamPayload) || hasOutputError(upstreamPayload) || !upstream.ok) {
+      const status = upstreamPayload?.status ?? upstreamPayload?.state ?? null
+      const body: Record<string, unknown> = {
+        id: extractJobId(upstreamPayload) ?? jobId ?? null,
+        status,
+        state: status,
+        error: INTERNAL_ERROR_MESSAGE,
+      }
+      if (ticketsLeft !== null) {
+        body.ticketsLeft = ticketsLeft
+      }
+      return jsonResponse(body, upstream.status, corsHeaders)
+    }
+    if (ticketsLeft !== null) {
+      upstreamPayload.ticketsLeft = ticketsLeft
+    }
     return jsonResponse(upstreamPayload, upstream.status, corsHeaders)
   }
 
-  return new Response(raw, {
-    status: upstream.status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
+  return jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 502, corsHeaders)
 }
 

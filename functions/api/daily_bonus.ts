@@ -21,8 +21,9 @@ type DailyBonusStateRow = {
 }
 
 const SIGNUP_TICKET_GRANT = 5
-const DAILY_BONUS_AMOUNT = 1
+const DAILY_BONUS_AMOUNT = 3
 const BONUS_WAIT_MS = 24 * 60 * 60 * 1000
+const INTERNAL_ERROR_MESSAGE = 'エラーです。やり直してください。'
 const corsMethods = 'GET, POST, OPTIONS'
 
 const jsonResponse = (body: unknown, status = 200, headers: HeadersInit = {}) =>
@@ -290,15 +291,8 @@ const grantDailyBonusCoin = async (
   return { ticketsLeft: null, error: new Error('Failed to grant daily bonus.') as Error }
 }
 
-const isGoogleUser = (user: User) => {
-  if (user.app_metadata?.provider === 'google') return true
-  if (Array.isArray(user.identities)) {
-    return user.identities.some((identity) => identity.provider === 'google')
-  }
-  return false
-}
 
-const requireGoogleUser = async (request: Request, env: Env, corsHeaders: HeadersInit) => {
+const requireAuthenticatedUser = async (request: Request, env: Env, corsHeaders: HeadersInit) => {
   const token = extractBearerToken(request)
   if (!token) {
     return { response: jsonResponse({ error: 'ログインが必要です。' }, 401, corsHeaders) }
@@ -312,9 +306,6 @@ const requireGoogleUser = async (request: Request, env: Env, corsHeaders: Header
   const { data, error } = await admin.auth.getUser(token)
   if (error || !data?.user) {
     return { response: jsonResponse({ error: '認証に失敗しました。' }, 401, corsHeaders) }
-  }
-  if (!isGoogleUser(data.user)) {
-    return { response: jsonResponse({ error: 'Googleログインのみ利用できます。' }, 403, corsHeaders) }
   }
   return { admin, user: data.user }
 }
@@ -333,22 +324,22 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     return new Response(null, { status: 403, headers: corsHeaders })
   }
 
-  const auth = await requireGoogleUser(request, env, corsHeaders)
+  const auth = await requireAuthenticatedUser(request, env, corsHeaders)
   if ('response' in auth) {
     return auth.response
   }
 
   const { data: ticketRow, error } = await ensureTicketRow(auth.admin, auth.user)
   if (error) {
-    return jsonResponse({ error: error.message }, 500, corsHeaders)
+    return jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 500, corsHeaders)
   }
   if (!ticketRow) {
-    return jsonResponse({ error: 'No ticket row.' }, 500, corsHeaders)
+    return jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 500, corsHeaders)
   }
 
   const bonus = await fetchDailyBonusState(auth.admin, ticketRow.id)
   if (bonus.error) {
-    return jsonResponse({ error: bonus.error.message }, 500, corsHeaders)
+    return jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 500, corsHeaders)
   }
 
   const nextEligibleAt = bonus.data?.next_eligible_at ?? calculateInitialEligibleAt(ticketRow.created_at)
@@ -375,7 +366,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return new Response(null, { status: 403, headers: corsHeaders })
   }
 
-  const auth = await requireGoogleUser(request, env, corsHeaders)
+  const auth = await requireAuthenticatedUser(request, env, corsHeaders)
   if ('response' in auth) {
     return auth.response
   }
@@ -387,18 +378,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const { data: ticketRow, error: ticketError } = await ensureTicketRow(auth.admin, auth.user)
   if (ticketError) {
-    return jsonResponse({ error: ticketError.message }, 500, corsHeaders)
+    return jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 500, corsHeaders)
   }
   if (!ticketRow) {
-    return jsonResponse({ error: 'No ticket row.' }, 500, corsHeaders)
+    return jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 500, corsHeaders)
   }
 
   const bonusState = await ensureDailyBonusStateRow(auth.admin, ticketRow, auth.user.id)
   if (bonusState.error) {
-    return jsonResponse({ error: bonusState.error.message }, 500, corsHeaders)
+    return jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 500, corsHeaders)
   }
   if (!bonusState.data) {
-    return jsonResponse({ error: 'daily_bonus_state row not found.' }, 500, corsHeaders)
+    return jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 500, corsHeaders)
   }
 
   const nowMs = Date.now()
@@ -428,7 +419,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     bonusState.data.claim_count ?? 0,
   )
   if (claimSlot.error) {
-    return jsonResponse({ error: claimSlot.error.message }, 500, corsHeaders)
+    return jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 500, corsHeaders)
   }
 
   if (!claimSlot.claimed) {
@@ -460,7 +451,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       })
       .eq('ticket_id', ticketRow.id)
       .eq('next_eligible_at', claimSlot.nextEligibleAt)
-    return jsonResponse({ error: grant.error.message }, 500, corsHeaders)
+    return jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 500, corsHeaders)
   }
 
   const safeTicketsLeft = Number.isFinite(Number(grant.ticketsLeft))

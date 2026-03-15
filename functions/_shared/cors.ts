@@ -3,11 +3,10 @@ type CorsEnv = {
 }
 
 const DEFAULT_ALLOWED_ORIGINS = [
-  'https://sparkart.work',
-  'https://sparkart.pages.dev',
-  '*.sparkart.pages.dev',
-  'https://sparkmotion.work',
-  'https://www.sparkmotion.work',
+  'https://sharkai.uk',
+  'https://www.sharkai.uk',
+  'https://shark.pages.dev',
+  '*.shark.pages.dev',
 ]
 
 const normalize = (value: string) => value.trim().toLowerCase()

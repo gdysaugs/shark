@@ -1,12 +1,27 @@
 import { onRequestGet as qwenGet, onRequestPost as qwenPost, onRequestOptions as qwenOptions } from '../functions/api/qwen'
 import {
-  onRequestGet as qwenSparkArtGet,
-  onRequestPost as qwenSparkArtPost,
-  onRequestOptions as qwenSparkArtOptions,
-} from '../functions/api/qwen_sparkart'
+  onRequestGet as qwenEditGet,
+  onRequestPost as qwenEditPost,
+  onRequestOptions as qwenEditOptions,
+} from '../functions/api/qwen_edit'
+import {
+  onRequestGet as lipsyncGet,
+  onRequestPost as lipsyncPost,
+  onRequestOptions as lipsyncOptions,
+} from '../functions/api/lipsync'
 import { onRequestGet as wanGet, onRequestPost as wanPost, onRequestOptions as wanOptions } from '../functions/api/wan'
 import { onRequestGet as wanRemixGet, onRequestPost as wanRemixPost, onRequestOptions as wanRemixOptions } from '../functions/api/wan_remix'
 import { onRequestGet as wanRapidGet, onRequestPost as wanRapidPost, onRequestOptions as wanRapidOptions } from '../functions/api/wan-rapid'
+import {
+  onRequestGet as wanRapidFastmoveGet,
+  onRequestPost as wanRapidFastmovePost,
+  onRequestOptions as wanRapidFastmoveOptions,
+} from '../functions/api/wan-rapid-fastmove'
+import {
+  onRequestGet as wanSmoothmixGet,
+  onRequestPost as wanSmoothmixPost,
+  onRequestOptions as wanSmoothmixOptions,
+} from '../functions/api/wan-smoothmix'
 import { onRequestGet as ticketsGet, onRequestOptions as ticketsOptions } from '../functions/api/tickets'
 import { onRequestGet as dailyBonusGet, onRequestPost as dailyBonusPost, onRequestOptions as dailyBonusOptions } from '../functions/api/daily_bonus'
 import { onRequestPost as r2PresignPost, onRequestOptions as r2PresignOptions } from '../functions/api/r2_presign'
@@ -68,10 +83,10 @@ export default {
       return methodNotAllowed()
     }
 
-    if (path.startsWith('/api/qwen_sparkart')) {
-      if (method === 'OPTIONS') return qwenSparkArtOptions(args as any)
-      if (method === 'GET') return qwenSparkArtGet(args as any)
-      if (method === 'POST') return qwenSparkArtPost(args as any)
+    if (path.startsWith('/api/qwen_edit')) {
+      if (method === 'OPTIONS') return qwenEditOptions(args as any)
+      if (method === 'GET') return qwenEditGet(args as any)
+      if (method === 'POST') return qwenEditPost(args as any)
       return methodNotAllowed()
     }
 
@@ -82,10 +97,31 @@ export default {
       return methodNotAllowed()
     }
 
+    if (path.startsWith('/api/lipsync')) {
+      if (method === 'OPTIONS') return lipsyncOptions(args as any)
+      if (method === 'GET') return lipsyncGet(args as any)
+      if (method === 'POST') return lipsyncPost(args as any)
+      return methodNotAllowed()
+    }
+
     if (path.startsWith('/api/wan-remix')) {
       if (method === 'OPTIONS') return wanRemixOptions(args as any)
       if (method === 'GET') return wanRemixGet(args as any)
       if (method === 'POST') return wanRemixPost(args as any)
+      return methodNotAllowed()
+    }
+
+    if (path.startsWith('/api/wan-rapid-fastmove')) {
+      if (method === 'OPTIONS') return wanRapidFastmoveOptions(args as any)
+      if (method === 'GET') return wanRapidFastmoveGet(args as any)
+      if (method === 'POST') return wanRapidFastmovePost(args as any)
+      return methodNotAllowed()
+    }
+
+    if (path.startsWith('/api/wan-smoothmix')) {
+      if (method === 'OPTIONS') return wanSmoothmixOptions(args as any)
+      if (method === 'GET') return wanSmoothmixGet(args as any)
+      if (method === 'POST') return wanSmoothmixPost(args as any)
       return methodNotAllowed()
     }
 

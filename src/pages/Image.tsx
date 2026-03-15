@@ -7,9 +7,8 @@ import {
   type ChangeEvent,
   type CSSProperties,
 } from 'react'
-import { useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
-import { isAuthConfigured, supabase } from '../lib/supabaseClient'
+import { ensureAuthConfigured, isAuthConfigured, supabase } from '../lib/supabaseClient'
 import { getOAuthRedirectUrl } from '../lib/oauthRedirect'
 import { TopNav } from '../components/TopNav'
 import { GuestIntro } from '../components/GuestIntro'
@@ -261,7 +260,6 @@ export function Image() {
   const [showTicketModal, setShowTicketModal] = useState(false)
   const [errorModalMessage, setErrorModalMessage] = useState<string | null>(null)
   const runIdRef = useRef(0)
-  const navigate = useNavigate()
 
   const accessToken = session?.access_token ?? ''
   const canGenerate = Boolean(sourcePayload) && prompt.trim().length > 0 && !isRunning
@@ -334,7 +332,7 @@ export function Image() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         setTicketStatus('error')
-        setTicketMessage(data?.error || 'コインの取得に失敗しました。')
+        setTicketMessage(data?.error || 'トークンの取得に失敗しました。')
         setTicketCount(null)
         return null
       }
@@ -387,7 +385,7 @@ export function Image() {
         const message = normalizeErrorMessage(rawMessage)
         if (isTicketShortage(res.status, message)) {
           setShowTicketModal(true)
-          setStatusMessage('コイン不足')
+          setStatusMessage('トークン不足')
           throw new Error('TICKET_SHORTAGE')
         }
         setErrorModalMessage(message)
@@ -421,7 +419,7 @@ export function Image() {
         const message = normalizeErrorMessage(rawMessage)
         if (isTicketShortage(res.status, message)) {
           setShowTicketModal(true)
-          setStatusMessage('コイン不足')
+          setStatusMessage('トークン不足')
           throw new Error('TICKET_SHORTAGE')
         }
         setErrorModalMessage(message)
@@ -479,8 +477,8 @@ export function Image() {
       } catch (error) {
         const message = normalizeErrorMessage(error instanceof Error ? error.message : error)
         if (message === 'TICKET_SHORTAGE') {
-          setResult({ id: makeId(), status: 'error', error: 'コイン不足' })
-          setStatusMessage('コイン不足')
+          setResult({ id: makeId(), status: 'error', error: 'トークン不足' })
+          setStatusMessage('トークン不足')
         } else {
           setResult({ id: makeId(), status: 'error', error: message })
           setStatusMessage(message)
@@ -500,18 +498,18 @@ export function Image() {
       return
     }
     if (ticketStatus === 'loading') {
-      setStatusMessage('コインを確認中...')
+      setStatusMessage('トークンを確認中...')
       return
     }
     if (accessToken) {
-      setStatusMessage('コインを確認中...')
+      setStatusMessage('トークンを確認中...')
       const latestCount = await fetchTickets(accessToken)
       if (latestCount !== null && latestCount < IMAGE_TICKET_COST) {
         setShowTicketModal(true)
         return
       }
     } else if (ticketCount === null) {
-      setStatusMessage('コインを確認中...')
+      setStatusMessage('トークンを確認中...')
       return
     } else if (ticketCount < IMAGE_TICKET_COST) {
       setShowTicketModal(true)
@@ -521,7 +519,8 @@ export function Image() {
   }
 
   const handleGoogleSignIn = async () => {
-    if (!supabase || !isAuthConfigured) {
+    const authReady = await ensureAuthConfigured()
+    if (!authReady || !supabase || !isAuthConfigured) {
       window.alert('認証設定が不足しています。')
       return
     }
@@ -538,10 +537,6 @@ export function Image() {
       return
     }
     window.alert('OAuth URLの取得に失敗しました。')
-  }
-
-  const handleEmailLoginNavigate = () => {
-    navigate('/email-login')
   }
 
   const clearImage = () => {
@@ -612,7 +607,7 @@ export function Image() {
     return (
       <div className="camera-app">
         <TopNav />
-        <GuestIntro mode="image" onSignIn={handleGoogleSignIn} onEmailLogin={handleEmailLoginNavigate} />
+        <GuestIntro mode="image" onSignIn={handleGoogleSignIn} />
       </div>
     )
   }
@@ -625,8 +620,8 @@ export function Image() {
           <div className="wizard-card wizard-card--step">
             <div className="wizard-stepper">
               <div className="wizard-status">
-                {ticketStatus === 'loading' && 'コインを確認中...'}
-                {ticketStatus !== 'loading' && `コイン: ${ticketCount ?? 0}`}
+                {ticketStatus === 'loading' && 'トークンを確認中...'}
+                {ticketStatus !== 'loading' && `トークン: ${ticketCount ?? 0}`}
                 {ticketStatus === 'error' && ticketMessage ? ` / ${ticketMessage}` : ''}
               </div>
               <h2>画像編集</h2>
@@ -717,8 +712,8 @@ export function Image() {
       {showTicketModal && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-card">
-            <h3>コイン不足</h3>
-            <p>画像生成は1コイン必要です。購入ページへ移動しますか？</p>
+            <h3>トークン不足</h3>
+            <p>画像生成は1トークン必要です。購入ページへ移動しますか？</p>
             <div className="modal-actions">
               <button type="button" className="ghost-button" onClick={() => setShowTicketModal(false)}>
                 閉じる

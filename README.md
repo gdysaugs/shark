@@ -16,7 +16,7 @@ Create `.env` from `.env.example`:
 ```
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
-VITE_SUPABASE_REDIRECT_URL=https://your-domain
+VITE_SUPABASE_REDIRECT_URL=https://sharkai.uk
 OPENAI_API_KEY=...
 OPENAI_MODEL=gpt-4o-mini
 ```
@@ -44,14 +44,56 @@ npm run dev
 
 ## Cloudflare Pages
 
-Build command:
+Project:
 ```
+shark
+```
+
+Production branch:
+```
+main
+```
+
+Build command:
+```bash
 npm run build
 ```
 
 Output dir:
-```
+```bash
 dist
 ```
 
-Set environment variables in Pages -> Settings -> Environment variables.
+Deploy to `shark` (with `functions/`):
+```bash
+npm run pages:deploy
+```
+
+Local Pages runtime (with `functions/`):
+```bash
+npm run pages:dev
+```
+
+Set function environment variables in:
+`Cloudflare Pages -> shark -> Settings -> Environment variables`
+
+Functions env keys used in this repo:
+```bash
+COMFY_ORG_API_KEY
+R2_REGION
+RUNPOD_API_KEY
+RUNPOD_ENDPOINT_URL
+RUNPOD_QWEN_ENDPOINT_URL
+RUNPOD_WAN_ENDPOINT_URL
+RUNPOD_WAN_RAPID_ENDPOINT_URL
+RUNPOD_WAN_REMIX_ENDPOINT_URL
+RUNPOD_WORKER_MODE
+RUNPOD_ZIMAGE_ENDPOINT_URL
+SOVITS_FRAGMENT_INTERVAL
+SOVITS_SPEED_FACTOR
+SUPABASE_SERVICE_ROLE_KEY
+SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+VITE_SUPABASE_REDIRECT_URL
+VITE_SUPABASE_URL
+```

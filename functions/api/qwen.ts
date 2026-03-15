@@ -751,7 +751,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     payload = null
   }
 
-  if (payload && (isFailureStatus(payload) || hasOutputError(payload))) {
+  const shouldReturnFailure = Boolean(payload) && (!upstream.ok || isFailureStatus(payload) || hasOutputError(payload))
+  if (shouldReturnFailure && payload) {
     const ticketMeta = {
       job_id: id,
       status: payload?.status ?? payload?.state ?? null,
@@ -759,22 +760,29 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       reason: 'failure',
     }
     const refundResult = await refundTicket(auth.admin, auth.user, ticketMeta, usageId, corsHeaders)
+    if ('response' in refundResult) {
+      return refundResult.response
+    }
     const nextTickets = Number((refundResult as { ticketsLeft?: unknown }).ticketsLeft)
     if (Number.isFinite(nextTickets)) {
       ticketsLeft = nextTickets
     }
+    return internalErrorResponse(corsHeaders, upstream.status, {
+      usage_id: usageId,
+      id: extractJobId(payload) ?? id,
+      ticketsLeft,
+    })
   }
 
-  if (ticketsLeft !== null && payload && typeof payload === 'object' && !Array.isArray(payload)) {
-    payload.ticketsLeft = ticketsLeft
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
     payload.usage_id = usageId
+    if (ticketsLeft !== null) {
+      payload.ticketsLeft = ticketsLeft
+    }
     return jsonResponse(payload, upstream.status, corsHeaders)
   }
 
-  return new Response(raw, {
-    status: upstream.status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
+  return internalErrorResponse(corsHeaders, 502, { usage_id: usageId, id })
   } catch (error) {
     return internalErrorResponse(corsHeaders)
   }
@@ -1201,10 +1209,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       usageId,
       corsHeaders,
     )
+    if ('response' in refundResult) {
+      return refundResult.response
+    }
     const nextTickets = Number((refundResult as { ticketsLeft?: unknown }).ticketsLeft)
     if (Number.isFinite(nextTickets)) {
       ticketsLeft = nextTickets
     }
+    return internalErrorResponse(corsHeaders, upstream.status, {
+      usage_id: usageId,
+      id: extractJobId(upstreamPayload) ?? null,
+      ticketsLeft,
+    })
   }
 
   upstreamPayload.usage_id = usageId

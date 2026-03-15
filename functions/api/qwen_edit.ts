@@ -1,4 +1,4 @@
-﻿import workflowTemplate from './qwen-sparkart-workflow.json'
+﻿import workflowTemplate from './qwen-edit-workflow-lite.json'
 import { createClient, type User } from '@supabase/supabase-js'
 import { buildCorsHeaders, isCorsBlocked } from '../_shared/cors'
 
@@ -482,6 +482,27 @@ const isFailureStatus = (status: unknown) => {
   return normalized.includes('fail') || normalized.includes('error') || normalized.includes('cancel')
 }
 
+
+const buildSanitizedFailurePayload = (
+  payload: any,
+  usageId: string,
+  fallbackId?: string,
+  ticketsLeft?: number | null,
+) => {
+  const status = payload?.status ?? payload?.state ?? null
+  const body: Record<string, unknown> = {
+    id: extractJobId(payload) ?? fallbackId ?? null,
+    usage_id: usageId,
+    status,
+    state: status,
+    error: INTERNAL_ERROR_MESSAGE,
+  }
+  if (ticketsLeft !== null && ticketsLeft !== undefined) {
+    body.ticketsLeft = ticketsLeft
+  }
+  return body
+}
+
 export const onRequestOptions: PagesFunction<Env> = async ({ request, env }) => {
   const corsHeaders = buildCorsHeaders(request, env, corsMethods)
   if (isCorsBlocked(request, env)) {
@@ -516,7 +537,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     if (!usageId) {
       return jsonResponse({ error: 'usage_id is required.' }, 400, corsHeaders)
     }
-    const expectedUsageId = `qwen_sparkart:${id}`
+    const expectedUsageId = `qwen_edit:${id}`
     if (usageId !== expectedUsageId) {
       return jsonResponse({ error: 'usage_id and id do not match.' }, 400, corsHeaders)
     }
@@ -553,6 +574,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       if (Number.isFinite(nextTickets)) {
         ticketsLeft = nextTickets
       }
+      return jsonResponse(buildSanitizedFailurePayload(payload, usageId, id, ticketsLeft), upstream.status, corsHeaders)
     }
 
     if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
@@ -563,10 +585,15 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       return jsonResponse(payload, upstream.status, corsHeaders)
     }
 
-    return new Response(raw, {
-      status: upstream.status,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(
+      {
+        error: INTERNAL_ERROR_MESSAGE,
+        usage_id: usageId,
+        id,
+      },
+      502,
+      corsHeaders,
+    )
   } catch (error) {
     return jsonResponse({ error: 'Qwen status request failed.' }, 502, corsHeaders)
   }
@@ -711,12 +738,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     })
 
     const raw = await upstream.text()
-    const headers = { ...corsHeaders, 'Content-Type': 'application/json' }
     let parsed: any = null
     try {
       parsed = JSON.parse(raw)
     } catch {
-      return new Response(raw, { status: upstream.status, headers })
+      return jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 502, corsHeaders)
     }
 
     if (multiAngleEnabled && isMissingMultiAngleLoraError(parsed)) {
@@ -744,9 +770,21 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     let ticketsLeft: number | null = null
     let usageId: string | null = null
     const shouldCharge = upstream.ok && !isFailureStatus(upstreamStatus) && !upstreamError
+    if (!shouldCharge) {
+      return jsonResponse(
+        {
+          id: extractJobId(parsed) ?? null,
+          status: upstreamStatus || null,
+          state: upstreamStatus || null,
+          error: INTERNAL_ERROR_MESSAGE,
+        },
+        upstream.status,
+        corsHeaders,
+      )
+    }
     if (shouldCharge) {
       const jobId = extractJobId(parsed)
-      usageId = jobId ? `qwen_sparkart:${jobId}` : `qwen_sparkart:${makeUsageId()}`
+      usageId = jobId ? `qwen_edit:${jobId}` : `qwen_edit:${makeUsageId()}`
       const ticketMeta = {
         prompt_length: prompt.length,
         width,

@@ -3,7 +3,10 @@ import workflowT2VTemplate from './wan-remix-workflow-t2v.json'
 import nodeMapI2VTemplate from './wan-remix-node-map-i2v.json'
 import nodeMapT2VTemplate from './wan-remix-node-map-t2v.json'
 import workflowRapidI2VTemplate from './wan-rapid-workflow-i2v.json'
+import workflowRapidFastmoveI2VTemplate from './wan-rapid-fastmove-workflow-i2v.json'
+import workflowSmoothmixI2VTemplate from './wan-smoothmix-workflow-i2v.json'
 import nodeMapRapidI2VTemplate from './wan-rapid-node-map-i2v.json'
+import nodeMapSmoothmixI2VTemplate from './wan-smoothmix-node-map-i2v.json'
 import { createClient, type User } from '@supabase/supabase-js'
 import { buildCorsHeaders, isCorsBlocked } from '../_shared/cors'
 import { isUnderageImage } from '../_shared/rekognition'
@@ -46,6 +49,26 @@ const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs: numbe
 const resolveEndpoint = (env: Env) =>
   (env.RUNPOD_WAN_REMIX_ENDPOINT_URL ?? env.RUNPOD_WAN_ENDPOINT_URL ?? env.RUNPOD_ENDPOINT_URL)?.replace(/\/$/, '')
 
+const ENDPOINT_MISSING_MESSAGE = 'サーバー設定エラーです。しばらくして再度お試しください。'
+
+const getEndpointMissingMessage = (request: Request) => {
+  try {
+    const path = new URL(request.url).pathname.toLowerCase()
+    if (path.includes('/api/wan-smoothmix')) {
+      return ENDPOINT_MISSING_MESSAGE
+    }
+    if (path.includes('/api/wan-rapid-fastmove')) {
+      return ENDPOINT_MISSING_MESSAGE
+    }
+    if (path.includes('/api/wan-rapid')) {
+      return ENDPOINT_MISSING_MESSAGE
+    }
+  } catch {
+    // fall through
+  }
+  return ENDPOINT_MISSING_MESSAGE
+}
+
 type NodeMapEntry = {
   id: string
   input: string
@@ -69,14 +92,19 @@ type NodeMap = Partial<{
 }>
 
 const SIGNUP_TICKET_GRANT = 5
-const LOW_QUALITY_TICKET_COST = 1
-const MEDIUM_QUALITY_TICKET_COST = 2
-const HIGH_QUALITY_TICKET_COST = 3
+const LOW_QUALITY_TICKET_COST = 0
+const MEDIUM_QUALITY_TICKET_COST = 1
+const HIGH_QUALITY_TICKET_COST = 2
+const SHORT_DURATION_TICKET_COST = 1
+const MEDIUM_DURATION_TICKET_COST = 2
+const LONG_DURATION_TICKET_COST = 3
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const MAX_PROMPT_LENGTH = 1000
 const MAX_NEGATIVE_PROMPT_LENGTH = 1000
 const FIXED_STEPS = 4
-const RAPID_I2V_FIXED_STEPS = 6
+const RAPID_I2V_FIXED_STEPS = 4
+const SMOOTHMIX_I2V_FIXED_STEPS = 6
+const RAPID_FASTMOVE_I2V_FIXED_STEPS = 4
 const MIN_DIMENSION = 256
 const MAX_DIMENSION = 3000
 const MIN_CFG = 0
@@ -87,18 +115,23 @@ const HIGH_QUALITY_FPS = 12
 const ALLOWED_FPS = [LOW_QUALITY_FPS, MEDIUM_QUALITY_FPS, HIGH_QUALITY_FPS] as const
 const DEFAULT_FPS = MEDIUM_QUALITY_FPS
 const DEFAULT_SECONDS = 6
+const ALLOWED_SECONDS = [6, 8, 10] as const
 const FIXED_SIZE_MULTIPLE = 64
 const FIXED_MAX_LONG_SIDE = 768
 const DEFAULT_WIDTH = 768
 const DEFAULT_HEIGHT = 448
 const UNDERAGE_BLOCK_MESSAGE =
   'この画像には暴力的な表現、低年齢、または規約違反の可能性があります。別の画像でお試しください。'
+const PREMIUM_USAGE_ID_PREFIX = 'premium_status:'
+const PREMIUM_10S_ONLY_MESSAGE = '10秒動画はプレミアム限定です。'
 
-type WorkflowFlavor = 'rapid' | 'remix'
+type WorkflowFlavor = 'rapid' | 'rapid_fastmove' | 'smoothmix' | 'remix'
 
 const resolveWorkflowFlavor = (request: Request): WorkflowFlavor => {
   try {
     const path = new URL(request.url).pathname.toLowerCase()
+    if (path.includes('/api/wan-smoothmix')) return 'smoothmix'
+    if (path.includes('/api/wan-rapid-fastmove')) return 'rapid_fastmove'
     if (path.includes('/api/wan-rapid')) return 'rapid'
   } catch {
     // fall through
@@ -108,12 +141,18 @@ const resolveWorkflowFlavor = (request: Request): WorkflowFlavor => {
 
 const getWorkflowTemplate = async (mode: 'i2v' | 't2v', flavor: WorkflowFlavor) => {
   if (mode === 't2v') return workflowT2VTemplate as Record<string, unknown>
-  return (flavor === 'rapid' ? workflowRapidI2VTemplate : workflowI2VTemplate) as Record<string, unknown>
+  if (flavor === 'smoothmix') return workflowSmoothmixI2VTemplate as Record<string, unknown>
+  if (flavor === 'rapid') return workflowRapidI2VTemplate as Record<string, unknown>
+  if (flavor === 'rapid_fastmove') return workflowRapidFastmoveI2VTemplate as Record<string, unknown>
+  return workflowI2VTemplate as Record<string, unknown>
 }
 
 const getNodeMap = async (mode: 'i2v' | 't2v', flavor: WorkflowFlavor) => {
   if (mode === 't2v') return nodeMapT2VTemplate as NodeMap
-  return (flavor === 'rapid' ? nodeMapRapidI2VTemplate : nodeMapI2VTemplate) as NodeMap
+  if (flavor === 'smoothmix') return nodeMapSmoothmixI2VTemplate as NodeMap
+  if (flavor === 'rapid') return nodeMapRapidI2VTemplate as NodeMap
+  if (flavor === 'rapid_fastmove') return nodeMapI2VTemplate as NodeMap
+  return nodeMapI2VTemplate as NodeMap
 }
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
@@ -266,6 +305,25 @@ const ensureTicketAvailable = async (
   }
 
   return { existing }
+}
+
+const fetchPremiumStatus = async (
+  admin: ReturnType<typeof createClient>,
+  user: User,
+  corsHeaders: HeadersInit = {},
+) => {
+  const usageId = `${PREMIUM_USAGE_ID_PREFIX}${user.id}`
+  const { data, error } = await admin
+    .from('ticket_events')
+    .select('delta')
+    .eq('usage_id', usageId)
+    .maybeSingle()
+
+  if (error) {
+    return { response: internalErrorResponse(corsHeaders) }
+  }
+
+  return { isPremium: Number(data?.delta || 0) > 0 }
 }
 
 const consumeTicket = async (
@@ -430,7 +488,8 @@ const resolveTicketCostForUsage = async (
   }
 
   const fps = extractFpsFromPayload(payload)
-  return ticketCostForFps(fps)
+  const seconds = extractSecondsFromPayload(payload)
+  return ticketCostForFps(fps) + ticketCostForSeconds(seconds)
 }
 
 const ensureUsageOwnership = async (
@@ -544,7 +603,10 @@ const estimateBase64Bytes = (value: string) => {
   return Math.max(0, Math.floor((trimmed.length * 3) / 4) - padding)
 }
 
-const normalizeSeconds = (_value: unknown) => DEFAULT_SECONDS
+const normalizeSeconds = (value: unknown) => {
+  const requested = Math.floor(Number(value))
+  return ALLOWED_SECONDS.find((item) => item === requested) ?? DEFAULT_SECONDS
+}
 
 const normalizeFps = (value: unknown): (typeof ALLOWED_FPS)[number] => {
   const requested = Math.floor(Number(value))
@@ -555,6 +617,12 @@ const ticketCostForFps = (fps: number) => {
   if (fps >= HIGH_QUALITY_FPS) return HIGH_QUALITY_TICKET_COST
   if (fps <= LOW_QUALITY_FPS) return LOW_QUALITY_TICKET_COST
   return MEDIUM_QUALITY_TICKET_COST
+}
+
+const ticketCostForSeconds = (seconds: number) => {
+  if (seconds >= 10) return LONG_DURATION_TICKET_COST
+  if (seconds >= 8) return MEDIUM_DURATION_TICKET_COST
+  return SHORT_DURATION_TICKET_COST
 }
 
 const extractFpsFromPayload = (payload: any) => {
@@ -574,6 +642,25 @@ const extractFpsFromPayload = (payload: any) => {
     return normalizeFps(value)
   }
   return DEFAULT_FPS
+}
+
+const extractSecondsFromPayload = (payload: any) => {
+  const candidates = [
+    payload?.input?.seconds,
+    payload?.seconds,
+    payload?.output?.input?.seconds,
+    payload?.output?.seconds,
+    payload?.result?.input?.seconds,
+    payload?.result?.seconds,
+    payload?.metadata?.seconds,
+    payload?.output?.metadata?.seconds,
+    payload?.result?.metadata?.seconds,
+  ]
+  for (const value of candidates) {
+    if (value === undefined || value === null) continue
+    return normalizeSeconds(value)
+  }
+  return DEFAULT_SECONDS
 }
 
 const clampDimension = (value: number, maxLongSide: number) => {
@@ -662,7 +749,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   const endpoint = resolveEndpoint(env)
   if (!endpoint) {
-    return jsonResponse({ error: 'RUNPOD_WAN_REMIX_ENDPOINT_URL is not set.' }, 500, corsHeaders)
+    return jsonResponse({ error: getEndpointMissingMessage(request) }, 500, corsHeaders)
   }
   const ownershipUsageId = `wan_remix:${id}`
   const ownership = await ensureUsageOwnership(auth.admin, auth.user, ownershipUsageId, corsHeaders)
@@ -732,15 +819,27 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     }
   }
 
-  if (ticketsLeft !== null && payload && typeof payload === 'object' && !Array.isArray(payload)) {
-    payload.ticketsLeft = ticketsLeft
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    if (isFailureStatus(payload) || hasOutputError(payload) || !upstream.ok) {
+      const status = payload?.status ?? payload?.state ?? null
+      const body: Record<string, unknown> = {
+        id: extractJobId(payload) ?? id,
+        status,
+        state: status,
+        error: INTERNAL_ERROR_MESSAGE,
+      }
+      if (ticketsLeft !== null) {
+        body.ticketsLeft = ticketsLeft
+      }
+      return jsonResponse(body, upstream.status, corsHeaders)
+    }
+    if (ticketsLeft !== null) {
+      payload.ticketsLeft = ticketsLeft
+    }
     return jsonResponse(payload, upstream.status, corsHeaders)
   }
 
-  return new Response(raw, {
-    status: upstream.status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
+  return jsonResponse({ error: INTERNAL_ERROR_MESSAGE, id }, 502, corsHeaders)
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -760,7 +859,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const endpoint = resolveEndpoint(env)
   if (!endpoint) {
-    return jsonResponse({ error: 'RUNPOD_WAN_REMIX_ENDPOINT_URL is not set.' }, 500, corsHeaders)
+    return jsonResponse({ error: getEndpointMissingMessage(request) }, 500, corsHeaders)
   }
 
   const payload = await request.json().catch(() => null)
@@ -778,8 +877,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
   const isT2V = mode === 't2v'
   const workflowFlavor = resolveWorkflowFlavor(request)
-  if (workflowFlavor === 'rapid' && isT2V) {
-    return jsonResponse({ error: 'wan-rapid supports i2v only.' }, 400, corsHeaders)
+  if ((workflowFlavor === 'rapid' || workflowFlavor === 'rapid_fastmove' || workflowFlavor === 'smoothmix') && isT2V) {
+    return jsonResponse({ error: 'このモードは画像からの生成のみに対応しています。' }, 400, corsHeaders)
   }
   const imageValue = input?.image_base64 ?? input?.image ?? input?.image_url
   if (!isT2V && !imageValue) {
@@ -822,15 +921,32 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const prompt = String(input?.prompt ?? input?.text ?? '')
   const negativePrompt = String(input?.negative_prompt ?? input?.negative ?? '')
-  const steps = !isT2V && workflowFlavor === 'rapid' ? RAPID_I2V_FIXED_STEPS : FIXED_STEPS
+  const steps =
+    !isT2V && workflowFlavor === 'smoothmix'
+      ? SMOOTHMIX_I2V_FIXED_STEPS
+      : !isT2V && workflowFlavor === 'rapid'
+        ? RAPID_I2V_FIXED_STEPS
+      : !isT2V && workflowFlavor === 'rapid_fastmove'
+        ? RAPID_FASTMOVE_I2V_FIXED_STEPS
+        : FIXED_STEPS
   const cfg = 1
   const requestedWidth = Math.floor(Number(input?.width ?? DEFAULT_WIDTH))
   const requestedHeight = Math.floor(Number(input?.height ?? DEFAULT_HEIGHT))
   const seconds = normalizeSeconds(input?.seconds ?? DEFAULT_SECONDS)
+  const premium = await fetchPremiumStatus(auth.admin, auth.user, corsHeaders)
+  if ('response' in premium) {
+    return premium.response
+  }
+  const isPremium = premium.isPremium
+  if (seconds >= 10 && !isPremium) {
+    return jsonResponse({ error: PREMIUM_10S_ONLY_MESSAGE }, 403, corsHeaders)
+  }
   const fps = normalizeFps(input?.fps)
-  const ticketCost = ticketCostForFps(fps)
+  const ticketCost = ticketCostForFps(fps) + ticketCostForSeconds(seconds)
   const numFrames =
-    !isT2V && workflowFlavor === 'rapid' ? fps * seconds + 1 : fps * seconds
+    !isT2V && (workflowFlavor === 'rapid' || workflowFlavor === 'rapid_fastmove' || workflowFlavor === 'smoothmix')
+      ? fps * seconds + 1
+      : fps * seconds
   const seed = input?.randomize_seed
     ? Math.floor(Math.random() * 2147483647)
     : Number(input?.seed ?? 0)
@@ -861,9 +977,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const { width, height } = toSafeDimensions(requestedWidth, requestedHeight, FIXED_MAX_LONG_SIDE)
   const totalSteps = Math.max(1, Math.floor(steps))
   const splitStep =
-    !isT2V && workflowFlavor === 'rapid'
+    !isT2V && (workflowFlavor === 'rapid' || workflowFlavor === 'smoothmix')
       ? Math.max(1, Math.floor(totalSteps / 3))
-      : Math.max(1, Math.floor(totalSteps / 2))
+      : !isT2V && workflowFlavor === 'rapid_fastmove'
+        ? Math.max(1, Math.floor(totalSteps / 2))
+        : Math.max(1, Math.floor(totalSteps / 2))
 
   const ticketMeta = {
     prompt_length: prompt.length,
@@ -977,13 +1095,25 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
   }
 
-  if (ticketsLeft !== null && upstreamPayload && typeof upstreamPayload === 'object' && !Array.isArray(upstreamPayload)) {
-    upstreamPayload.ticketsLeft = ticketsLeft
+  if (upstreamPayload && typeof upstreamPayload === 'object' && !Array.isArray(upstreamPayload)) {
+    if (isFailureStatus(upstreamPayload) || hasOutputError(upstreamPayload) || !upstream.ok) {
+      const status = upstreamPayload?.status ?? upstreamPayload?.state ?? null
+      const body: Record<string, unknown> = {
+        id: extractJobId(upstreamPayload) ?? jobId ?? null,
+        status,
+        state: status,
+        error: INTERNAL_ERROR_MESSAGE,
+      }
+      if (ticketsLeft !== null) {
+        body.ticketsLeft = ticketsLeft
+      }
+      return jsonResponse(body, upstream.status, corsHeaders)
+    }
+    if (ticketsLeft !== null) {
+      upstreamPayload.ticketsLeft = ticketsLeft
+    }
     return jsonResponse(upstreamPayload, upstream.status, corsHeaders)
   }
 
-  return new Response(raw, {
-    status: upstream.status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
+  return jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 502, corsHeaders)
 }

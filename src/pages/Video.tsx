@@ -1,1 +1,5 @@
-export { Camera as Video } from './Camera'
+import { Camera } from './Camera'
+
+export function Video() {
+  return <Camera />
+}

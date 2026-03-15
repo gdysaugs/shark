@@ -7,12 +7,13 @@ import {
   type CSSProperties,
 } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { isAuthConfigured, signOutSafely, supabase } from '../lib/supabaseClient'
+import { ensureAuthConfigured, isAuthConfigured, signOutSafely, supabase } from '../lib/supabaseClient'
 import { getOAuthRedirectUrl } from '../lib/oauthRedirect'
 import { GuestIntro } from '../components/GuestIntro'
-import { SparkArtQwen } from './SparkArtQwen'
+import { QwenEditPanel } from './QwenEditPanel'
 import './camera.css'
 import './video-studio.css'
+import './fastmove.css'
 
 type RenderResult = {
   id: string
@@ -21,45 +22,65 @@ type RenderResult = {
   error?: string
 }
 
-type VideoEngine = 'remix' | 'rapid'
+type VideoModel = 'v1' | 'v2' | 'v3' | 'v4'
 type GenerationMode = 'i2v' | 'qwen_edit'
 type QualityPresetKey = 'low' | 'medium' | 'high'
+type DurationSeconds = 6 | 8 | 10
 type QualityPreset = {
   key: QualityPresetKey
   label: string
   fps: 8 | 10 | 12
-  cost: 1 | 2 | 3
+  cost: 0 | 1 | 2
+}
+type VideoModelConfig = {
+  id: VideoModel
+  label: 'V1' | 'V2' | 'V3' | 'V4'
+  endpoint: string
+  engine: string
 }
 
 const MAX_PARALLEL = 1
-const API_ENDPOINTS: Record<VideoEngine, string> = {
-  remix: '/api/wan-remix',
-  rapid: '/api/wan-rapid',
+const VIDEO_MODELS: Record<VideoModel, VideoModelConfig> = {
+  v1: { id: 'v1', label: 'V1', endpoint: '/api/wan-rapid', engine: 'rapid' },
+  v2: { id: 'v2', label: 'V2', endpoint: '/api/wan-smoothmix', engine: 'smoothmix' },
+  v3: { id: 'v3', label: 'V3', endpoint: '/api/wan-remix', engine: 'remix' },
+  v4: { id: 'v4', label: 'V4', endpoint: '/api/wan-rapid-fastmove', engine: 'rapid_fastmove' },
+}
+const VIDEO_MODEL_ORDER: readonly VideoModel[] = ['v1', 'v2', 'v3', 'v4']
+const VIDEO_MODEL_DESCRIPTIONS: Record<VideoModel, string> = {
+  v1: '大胆な動きとシーン変化に強いモデル。',
+  v2: '滑らかさと自然なモーション安定性を重視したモデル。',
+  v3: '演出表現と幅広いプロンプト適性に強いモデル。',
+  v4: '高精細ディテール保持と安定品質に強いモデル。',
 }
 const QUALITY_PRESETS: readonly QualityPreset[] = [
-  { key: 'low', label: '低画質', fps: 8, cost: 1 },
-  { key: 'medium', label: '中画質', fps: 10, cost: 2 },
-  { key: 'high', label: '高画質', fps: 12, cost: 3 },
+  { key: 'low', label: '速度優先', fps: 8, cost: 0 },
+  { key: 'medium', label: '安定重視', fps: 10, cost: 1 },
+  { key: 'high', label: '解像度優先', fps: 12, cost: 2 },
 ] as const
 const DEFAULT_QUALITY_INDEX = 1
-const FIXED_VIDEO_SECONDS = 6
-const REMIX_FIXED_STEPS = 4
-const RAPID_FIXED_STEPS = 4
+const DEFAULT_DURATION_SECONDS: DurationSeconds = 6
+const durationTicketCostMap: Record<DurationSeconds, number> = {
+  6: 1,
+  8: 2,
+  10: 3,
+}
 const DEFAULT_CFG = 1
-const CFG_MIN = 0.1
-const CFG_MAX = 2
-const CFG_STEP = 0.1
 const FIXED_MAX_LONG_SIDE = 768
 const FIXED_MIN_SIDE = 256
 const FIXED_SIZE_MULTIPLE = 64
-const BONUS_ROULETTE_VALUES = [1] as const
+const FIXED_STEPS = 4
+const BONUS_ROULETTE_VALUES = [3] as const
 const OAUTH_REDIRECT_URL = getOAuthRedirectUrl()
-const DEFAULT_ENGINE: VideoEngine = 'rapid'
+const DEFAULT_VIDEO_MODEL: VideoModel = 'v4'
 const PROMPT_MAX_LENGTH = 1000
-const PROMPT_PLACEHOLDER = '例: 女が両手で胸を揉む'
-const getApiEndpoint = (engine: VideoEngine) => API_ENDPOINTS[engine] ?? API_ENDPOINTS.remix
+const PROMPT_PLACEHOLDER = '作りたい映像の指示を入力'
+const I2V_IMAGE_INPUT_ID = 'video-i2v-image-file'
 const COIN_PURCHASE_URL = 'https://checkoutcoins2.win/purchase.html'
-const SPARKMOTION_URL = 'https://sparkmotion.work/'
+const SHOP_URL = 'https://gettoken.uk/purchage/'
+const PREMIUM_10S_ONLY_MESSAGE = '10秒はプレミアム限定です。'
+const parseVideoModel = (value: string | null): VideoModel =>
+  value && value.toLowerCase() in VIDEO_MODELS ? (value.toLowerCase() as VideoModel) : DEFAULT_VIDEO_MODEL
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -95,7 +116,7 @@ const getImageSize = (file: File) =>
     }
     image.onerror = () => {
       URL.revokeObjectURL(url)
-      reject(new Error('Failed to read image size.'))
+      reject(new Error('画像サイズの取得に失敗しました。'))
     }
     image.src = url
   })
@@ -111,7 +132,7 @@ const fileToResizedPngDataUrl = (file: File, width: number, height: number) =>
       const ctx = canvas.getContext('2d')
       if (!ctx) {
         URL.revokeObjectURL(url)
-        reject(new Error('Failed to create image canvas.'))
+        reject(new Error('画像処理に失敗しました。'))
         return
       }
       ctx.imageSmoothingEnabled = true
@@ -122,7 +143,7 @@ const fileToResizedPngDataUrl = (file: File, width: number, height: number) =>
     }
     image.onerror = () => {
       URL.revokeObjectURL(url)
-      reject(new Error('Failed to resize image.'))
+      reject(new Error('画像のリサイズに失敗しました。'))
     }
     image.src = url
   })
@@ -200,7 +221,7 @@ const extractErrorMessage = (payload: any) =>
   payload?.result?.output?.error
 
 const POLICY_BLOCK_MESSAGE =
-  'This image may violate policy (violence/minor). Please use another image.'
+  'この画像には暴力的な表現、低年齢、または規約違反の可能性があります。別の画像でお試しください。'
 const GENERIC_RETRY_MESSAGE = 'エラーです。やり直してください。'
 
 const shouldMaskErrorMessage = (value: string) => {
@@ -222,7 +243,7 @@ const shouldMaskErrorMessage = (value: string) => {
 }
 
 const normalizeErrorMessage = (value: unknown) => {
-  if (!value) return 'Request failed.'
+  if (!value) return 'エラーです。'
   if (typeof value === 'object') {
     const maybe = value as { error?: unknown; message?: unknown; detail?: unknown }
     const picked = maybe?.error ?? maybe?.message ?? maybe?.detail
@@ -238,7 +259,7 @@ const normalizeErrorMessage = (value: unknown) => {
     lowered.includes('cuda') ||
     lowered.includes('oom')
   ) {
-    return 'Image size error. Please use a smaller image.'
+    return '画像サイズが大きすぎます。小さくして再度お試しください。'
   }
   if (
     lowered.includes('underage') ||
@@ -280,7 +301,7 @@ const isTicketShortage = (status: number, message: string) => {
     lowered.includes('insufficient_tickets') ||
     lowered.includes('insufficient tickets') ||
     lowered.includes('token不足') ||
-    lowered.includes('コイン') ||
+    lowered.includes('token') ||
     lowered.includes('token') ||
     lowered.includes('credit')
   )
@@ -354,6 +375,7 @@ const extractJobId = (payload: any) => payload?.id || payload?.jobId || payload?
 export function Camera() {
   const [generationMode, setGenerationMode] = useState<GenerationMode>('i2v')
   const [qualityIndex, setQualityIndex] = useState(DEFAULT_QUALITY_INDEX)
+  const [durationSeconds, setDurationSeconds] = useState<DurationSeconds>(DEFAULT_DURATION_SECONDS)
   const [prompt, setPrompt] = useState('')
   const [negativePrompt, setNegativePrompt] = useState('')
   const [cfg, setCfg] = useState(DEFAULT_CFG)
@@ -362,14 +384,16 @@ export function Camera() {
   const [results, setResults] = useState<RenderResult[]>([])
   const [statusMessage, setStatusMessage] = useState('')
   const [isRunning, setIsRunning] = useState(false)
+  const [videoModel, setVideoModel] = useState<VideoModel>(DEFAULT_VIDEO_MODEL)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
   const [authReady, setAuthReady] = useState(!supabase)
   const [ticketCount, setTicketCount] = useState<number | null>(null)
+  const [isPremium, setIsPremium] = useState(false)
   const [ticketStatus, setTicketStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [ticketMessage, setTicketMessage] = useState('')
   const [showTicketModal, setShowTicketModal] = useState(false)
   const [errorModalMessage, setErrorModalMessage] = useState<string | null>(null)
-  const [videoEngine, setVideoEngine] = useState<VideoEngine>(DEFAULT_ENGINE)
   const [bonusStatus, setBonusStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [bonusMessage, setBonusMessage] = useState('')
   const [bonusCanClaim, setBonusCanClaim] = useState(false)
@@ -388,13 +412,23 @@ export function Camera() {
   const progress = totalFrames ? completedCount / totalFrames : 0
   const displayVideo = results[0]?.video ?? null
   const accessToken = session?.access_token ?? ''
+  const selectedVideoModel = VIDEO_MODELS[videoModel] ?? VIDEO_MODELS[DEFAULT_VIDEO_MODEL]
+  const selectedVideoModelDescription =
+    VIDEO_MODEL_DESCRIPTIONS[videoModel] ?? VIDEO_MODEL_DESCRIPTIONS[DEFAULT_VIDEO_MODEL]
   const selectedQuality = QUALITY_PRESETS[qualityIndex] ?? QUALITY_PRESETS[DEFAULT_QUALITY_INDEX]
-  const selectedQualityWithCost = `${selectedQuality.label}(${selectedQuality.cost}コイン)`
+  const durationTicketCost = durationTicketCostMap[durationSeconds]
+  const totalTicketCost = selectedQuality.cost + durationTicketCost
+  const selectedQualityWithCost = `${selectedQuality.label}(${selectedQuality.cost}枚)`
+  const qualityDescription = `${selectedQuality.label} / ${durationSeconds}秒`
   const selectedFps = selectedQuality.fps
   const isI2vMode = generationMode === 'i2v'
+  const disableModeSwitch = isI2vMode && isRunning
   const generationLabel = isI2vMode ? '動画生成' : '画像生成'
-  const selectedTicketCost = isI2vMode ? selectedQuality.cost : 1
+  const selectedTicketCost = isI2vMode ? totalTicketCost : 1
   const canGenerate = prompt.trim().length > 0 && Boolean(sourceImageFile) && !isRunning
+  const durationHelpText = isPremium
+    ? '1枚の画像から 6秒 / 8秒 / 10秒 の動画を生成できます。'
+    : '1枚の画像から 6秒 / 8秒 の動画を生成できます（10秒はプレミアム限定）。';
 
   const getLatestAccessToken = useCallback(async () => {
     if (!supabase) return accessToken
@@ -472,6 +506,31 @@ export function Camera() {
   }, [])
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const mode = params.get('mode')?.toLowerCase()
+    setVideoModel(parseVideoModel(params.get('model')))
+    if (mode === 'edit' || mode === 'qwen_edit') {
+      setGenerationMode('qwen_edit')
+      return
+    }
+    if (mode === 'video' || mode === 'i2v') {
+      setGenerationMode('i2v')
+    }
+  }, [])
+
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const current = parseVideoModel(url.searchParams.get('model'))
+    if (current === videoModel) return
+    if (videoModel === DEFAULT_VIDEO_MODEL) {
+      url.searchParams.delete('model')
+    } else {
+      url.searchParams.set('model', videoModel)
+    }
+    window.history.replaceState({}, document.title, url.toString())
+  }, [videoModel])
+
+  useEffect(() => {
     if (!sourceImageFile) {
       setSourceImagePreview('')
       return
@@ -480,6 +539,23 @@ export function Camera() {
     setSourceImagePreview(url)
     return () => URL.revokeObjectURL(url)
   }, [sourceImageFile])
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prevOverflow
+    }
+  }, [isMobileMenuOpen])
+
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth > 960) setIsMobileMenuOpen(false)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -517,17 +593,22 @@ export function Camera() {
       if (!res.ok) {
         setTicketStatus('error')
         if (res.status === 401) {
-          setTicketMessage('認証に失敗しました。ログアウトして再ログインすれば正常に戻ります。')
+          setTicketMessage('認証に失敗しました。ログアウトして再ログインしてください。')
           setSession(null)
         } else {
-          setTicketMessage(data?.error || 'コイン残高の取得に失敗しました。')
+          setTicketMessage(data?.error || 'トークン残高の取得に失敗しました。')
         }
         return null
       }
       const nextCount = Number(data?.tickets ?? 0)
+      const nextIsPremium = Boolean(data?.isPremium)
       setTicketStatus('idle')
       setTicketMessage('')
       setTicketCount(nextCount)
+      setIsPremium(nextIsPremium)
+      if (!nextIsPremium) {
+        setDurationSeconds((prev) => (prev === 10 ? 8 : prev))
+      }
       return nextCount
     },
     [getLatestAccessToken],
@@ -543,7 +624,7 @@ export function Camera() {
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
       setBonusStatus('error')
-      setBonusMessage(data?.error || 'ボーナス状態の取得に失敗しました。')
+      setBonusMessage(data?.error || 'ログインボーナス状態の取得に失敗しました。')
       return
     }
     setBonusStatus('idle')
@@ -554,6 +635,7 @@ export function Camera() {
   useEffect(() => {
     if (!session || !accessToken) {
       setTicketCount(null)
+      setIsPremium(false)
       setTicketStatus('idle')
       setTicketMessage('')
       setBonusStatus('idle')
@@ -569,19 +651,19 @@ export function Camera() {
   const submitVideo = useCallback(
     async (token: string) => {
       if (!sourceImageFile) {
-        throw new Error('Please select an image.')
+        throw new Error('画像を選択してください。')
       }
       const imageSize = await getImageSize(sourceImageFile)
       const dims = toVideoDimensions(imageSize.width, imageSize.height)
       const imageDataUrl = await fileToResizedPngDataUrl(sourceImageFile, dims.width, dims.height)
-      const targetSeconds = FIXED_VIDEO_SECONDS
+      const targetSeconds = durationSeconds
       const targetFrameCount = selectedFps * targetSeconds + 1
       const stabilizedPrompt = `${prompt}, keep same person identity, keep same face, keep same camera distance, no zoom in`
       const stabilizedNegative = [negativePrompt, 'zoom in, close-up, crop, face distortion, identity change']
         .filter(Boolean)
         .join(', ')
       const input: Record<string, unknown> = {
-        engine: videoEngine,
+        engine: selectedVideoModel.engine,
         mode: 'i2v',
         image: imageDataUrl,
         image_name: 'input.png',
@@ -592,7 +674,7 @@ export function Camera() {
         fps: selectedFps,
         seconds: targetSeconds,
         num_frames: targetFrameCount,
-        steps: videoEngine === 'rapid' ? RAPID_FIXED_STEPS : REMIX_FIXED_STEPS,
+        steps: FIXED_STEPS,
         cfg: Number(cfg.toFixed(1)),
         seed: 0,
         randomize_seed: true,
@@ -602,14 +684,14 @@ export function Camera() {
       if (token) {
         headers.Authorization = `Bearer ${token}`
       }
-      const res = await fetch(getApiEndpoint(videoEngine), {
+      const res = await fetch(selectedVideoModel.endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify({ input }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const rawMessage = data?.error || data?.message || data?.detail || 'Generation failed.'
+        const rawMessage = data?.error || data?.message || data?.detail || '生成に失敗しました。'
         const message = normalizeErrorMessage(rawMessage)
         if (isTicketShortage(res.status, message)) {
           setShowTicketModal(true)
@@ -627,13 +709,14 @@ export function Camera() {
         return { videos }
       }
       const jobId = extractJobId(data)
-      if (!jobId) throw new Error('Failed to get job id.')
+      if (!jobId) throw new Error('ジョブIDの取得に失敗しました。')
       return { jobId }
     },
-    [cfg, negativePrompt, prompt, selectedFps, sourceImageFile, videoEngine],
+    [cfg, durationSeconds, negativePrompt, prompt, selectedFps, selectedVideoModel, sourceImageFile],
   )
 
-  const pollJob = useCallback(async (jobId: string, runId: number, token?: string, engine: VideoEngine = DEFAULT_ENGINE) => {
+  const pollJob = useCallback(async (jobId: string, runId: number, token?: string, model: VideoModel = DEFAULT_VIDEO_MODEL) => {
+    const config = VIDEO_MODELS[model] ?? VIDEO_MODELS[DEFAULT_VIDEO_MODEL]
     for (let i = 0; i < 180; i += 1) {
       if (runIdRef.current !== runId) return { status: 'cancelled' as const, videos: [] }
       const headers: Record<string, string> = {}
@@ -642,16 +725,16 @@ export function Camera() {
       }
       const query = new URLSearchParams({
         id: jobId,
-        engine,
+        engine: config.engine,
       })
-      const res = await fetch(`${getApiEndpoint(engine)}?${query.toString()}`, { headers })
+      const res = await fetch(`${config.endpoint}?${query.toString()}`, { headers })
       const data = await res.json().catch(() => ({}))
       if (res.status === 524 || res.status === 522 || res.status === 504) {
         await wait(1000)
         continue
       }
       if (!res.ok) {
-        const rawMessage = data?.error || data?.message || data?.detail || 'Failed to get status.'
+        const rawMessage = data?.error || data?.message || data?.detail || 'ステータス取得に失敗しました。'
         const message = normalizeErrorMessage(rawMessage)
         if (isTicketShortage(res.status, message)) {
           setShowTicketModal(true)
@@ -674,7 +757,7 @@ export function Camera() {
         }
       }
       if (statusError || isFailureStatus(status)) {
-        throw new Error(normalizeErrorMessage(statusError || 'Generation failed.'))
+        throw new Error(normalizeErrorMessage(statusError || '生成に失敗しました。'))
       }
       const videos = extractVideoList(data)
       if (videos.length) {
@@ -685,7 +768,7 @@ export function Camera() {
       }
       await wait(1000)
     }
-    throw new Error('Generation timed out.')
+    throw new Error('生成がタイムアウトしました。')
   }, [])
 
   const ensureTicketsForGeneration = useCallback(async () => {
@@ -694,12 +777,16 @@ export function Camera() {
       return false
     }
     if (ticketStatus === 'loading') {
-      setStatusMessage('コイン確認中...')
+      setStatusMessage('トークンを確認中...')
+      return false
+    }
+    if (durationSeconds >= 10 && !isPremium) {
+      setStatusMessage(PREMIUM_10S_ONLY_MESSAGE)
       return false
     }
     const token = accessToken || (await getLatestAccessToken())
     if (token) {
-      setStatusMessage('コイン確認中...')
+      setStatusMessage('トークンを確認中...')
       const latestCount = await fetchTickets(token)
       if (typeof latestCount === 'number' && latestCount < selectedTicketCost) {
         setShowTicketModal(true)
@@ -707,10 +794,10 @@ export function Camera() {
       }
       return true
     }
-    setStatusMessage('ログインセッションを確認できません。再ログインしてください。')
+    setStatusMessage('セッション確認に失敗しました。再ログインしてください。')
     setSession(null)
     return false
-  }, [accessToken, fetchTickets, getLatestAccessToken, selectedTicketCost, session, ticketStatus])
+  }, [accessToken, durationSeconds, fetchTickets, getLatestAccessToken, isPremium, selectedTicketCost, session, ticketStatus])
 
   const startBatch = useCallback(async () => {
     const hasTicket = await ensureTicketsForGeneration()
@@ -734,7 +821,7 @@ export function Camera() {
         try {
           const token = accessToken || (await getLatestAccessToken())
           if (!token) {
-            throw new Error('ログインセッションを確認できません。再ログインしてください。')
+            throw new Error('セッション確認に失敗しました。再ログインしてください。')
           }
           const submitted = await submitVideo(token)
           if (runIdRef.current !== runId) return
@@ -749,7 +836,7 @@ export function Camera() {
             return
           }
           if ('jobId' in submitted) {
-            const polled = await pollJob(submitted.jobId, runId, token, videoEngine)
+            const polled = await pollJob(submitted.jobId, runId, token, videoModel)
             if (runIdRef.current !== runId) return
             if (polled.status === 'done' && polled.videos.length) {
               setResults((prev) =>
@@ -779,7 +866,7 @@ export function Camera() {
 
       await runQueue(tasks, MAX_PARALLEL)
       if (runIdRef.current === runId) {
-        setStatusMessage('完了')
+        setStatusMessage('生成完了')
         const token = accessToken || (await getLatestAccessToken())
         if (token) {
           void fetchTickets(token)
@@ -795,7 +882,7 @@ export function Camera() {
         setIsRunning(false)
       }
     }
-  }, [accessToken, ensureTicketsForGeneration, fetchTickets, getLatestAccessToken, pollJob, submitVideo, videoEngine])
+  }, [accessToken, ensureTicketsForGeneration, fetchTickets, getLatestAccessToken, pollJob, submitVideo, videoModel])
 
   const handleGenerate = async () => {
     if (!sourceImageFile) {
@@ -807,15 +894,16 @@ export function Camera() {
       return
     }
     if (prompt.length > PROMPT_MAX_LENGTH) {
-      setStatusMessage(`プロンプトは最大${PROMPT_MAX_LENGTH}文字です。`)
+      setStatusMessage(`プロンプトは${PROMPT_MAX_LENGTH}文字以内で入力してください。`)
       return
     }
     await startBatch()
   }
 
   const handleGoogleSignIn = async () => {
-    if (!supabase || !isAuthConfigured) {
-      window.alert('Auth configuration is not ready.')
+    const authReady = await ensureAuthConfigured()
+    if (!authReady || !supabase || !isAuthConfigured) {
+      window.alert('認証設定の準備ができていません。')
       return
     }
     const { data, error } = await supabase.auth.signInWithOAuth({
@@ -830,18 +918,32 @@ export function Camera() {
       window.location.assign(data.url)
       return
     }
-    window.alert('Failed to get auth URL.')
+    window.alert('ログインURLの取得に失敗しました。')
   }
 
-  const handleEmailLogin = () => {
-    window.location.assign('/email-login')
-  }
+  const handleOpenFastMove = useCallback(() => {
+    setIsMobileMenuOpen(false)
+    setGenerationMode('i2v')
+    setVideoModel('v1')
+  }, [])
+
+  const handleOpenVideo = useCallback(() => {
+    setIsMobileMenuOpen(false)
+    setGenerationMode('i2v')
+  }, [])
+
+  const handleOpenLipSync = useCallback(() => {
+    setIsMobileMenuOpen(false)
+    window.location.assign('/lipsync')
+  }, [])
 
   const handleSignOut = async () => {
     if (!supabase) return
+    setIsMobileMenuOpen(false)
     await signOutSafely()
     setSession(null)
     setTicketCount(null)
+    setIsPremium(false)
     setTicketStatus('idle')
     setTicketMessage('')
     setBonusStatus('idle')
@@ -878,8 +980,8 @@ export function Camera() {
     const totalMinutes = Math.ceil(diffMs / 60_000)
     const hours = Math.floor(totalMinutes / 60)
     const minutes = totalMinutes % 60
-    if (hours > 0) return 'あと約' + hours + '時間' + minutes + '分で次回受取'
-    return 'あと約' + minutes + '分で次回受取'
+    if (hours > 0) return '次回受け取りまで約' + hours + '時間' + minutes + '分'
+    return '次回受け取りまで約' + minutes + '分'
   }
 
   const startBonusRoulette = () => {
@@ -921,7 +1023,7 @@ export function Camera() {
     if (!res.ok) {
       stopBonusRoulette()
       setBonusStatus('error')
-      setBonusMessage(data?.error || 'デイリーボーナスの受け取りに失敗しました。')
+      setBonusMessage(data?.error || 'ログインボーナスの受け取りに失敗しました。')
       setBonusClaiming(false)
       return
     }
@@ -934,7 +1036,7 @@ export function Camera() {
       const awardedRaw = Number(data?.awarded)
       const awarded = Number.isFinite(awardedRaw)
         ? Math.max(1, Math.floor(awardedRaw))
-        : 1
+        : 3
       if (Number.isFinite(nextTickets)) {
         setTicketCount(nextTickets)
       } else {
@@ -944,18 +1046,18 @@ export function Camera() {
       if (awarded !== null) {
         setBonusRouletteAwarded(awarded)
         stopBonusRoulette(awarded)
-        setBonusMessage(`デイリーボーナスを受け取りました。+${awarded}コイン`)
+        setBonusMessage(`ログインボーナス獲得: ${awarded}枚`)
       } else {
         setBonusRouletteAwarded(null)
         stopBonusRoulette()
-        setBonusMessage('デイリーボーナスを受け取りました。')
+        setBonusMessage('ログインボーナスを受け取りました。')
       }
     } else {
       setBonusRouletteAwarded(null)
       stopBonusRoulette()
       setBonusStatus('idle')
       setBonusMessage(
-        nextEligibleAt ? formatTimeUntilClaim(nextEligibleAt) : 'まだ受け取りできません。',
+        nextEligibleAt ? formatTimeUntilClaim(nextEligibleAt) : 'まだ受け取れません。',
       )
     }
     await fetchDailyBonus(accessToken)
@@ -967,7 +1069,7 @@ export function Camera() {
 
   const handleDownload = useCallback(async () => {
     if (!displayVideo) return
-    const filename = `sparkart-video.${isGif ? 'gif' : 'mp4'}`
+    const filename = `sharkai-video.${isGif ? 'gif' : 'mp4'}`
     try {
       let blob: Blob
       if (displayVideo.startsWith('data:')) {
@@ -1004,9 +1106,12 @@ export function Camera() {
     }
   }, [displayVideo, isGif])
 
+  const pageEyebrow = isI2vMode ? '動画生成' : '画像編集'
+  const pageTitle = isI2vMode ? '1枚の画像から動画を生成' : '画像編集生成'
+
   if (!authReady) {
     return (
-      <div className="camera-app video-studio-page">
+      <div className="camera-app fastmove-shell video-studio-page">
         <div className="auth-boot" />
       </div>
     )
@@ -1014,86 +1119,139 @@ export function Camera() {
 
   if (!session) {
     return (
-      <div className="camera-app camera-app--guest video-studio-page">
-        <GuestIntro mode="video" onSignIn={handleGoogleSignIn} onEmailLogin={handleEmailLogin} />
+      <div className="camera-app camera-app--guest fastmove-shell fastmove-shell--guest video-studio-page">
+        <GuestIntro mode="video" onSignIn={handleGoogleSignIn} />
       </div>
     )
   }
 
   return (
-    <div className="camera-app video-studio-page">
-      {isI2vMode ? (
-      <div className="video-studio-layout">
-        <section className="studio-block studio-block--input">
-          <header className="studio-head studio-head--with-mode">
-            <div className="studio-head__copy">
-              <h1>I2V</h1>
-              <p>
-                1枚の画像から6秒の動画を生成できます。
-              </p>
-            </div>
-            <div className="studio-mode-switch studio-mode-switch--inline" aria-label="Generation mode switch">
-              <button
-                type="button"
-                className={`studio-mode-switch__btn${isI2vMode ? ' is-active' : ''}`}
-                onClick={() => setGenerationMode('i2v')}
-                disabled={isRunning}
-              >
-                Video
-              </button>
-              <button
-                type="button"
-                className={`studio-mode-switch__btn${!isI2vMode ? ' is-active' : ''}`}
-                onClick={() => setGenerationMode('qwen_edit')}
-                disabled={isRunning}
-              >
-                Edit
-              </button>
-            </div>
-          </header>
-          <div className="studio-ticket-row">
-            <div className="studio-ticket">
-              {ticketStatus === 'loading' && 'コイン確認中...'}
-              {ticketStatus !== 'loading' && `保有コイン数 ${ticketCount ?? 0}枚` }
-              {ticketStatus === 'error' && ticketMessage ? ` / ${ticketMessage}` : ''}
-            </div>
-            <div className="studio-ticket-actions">
-              <button type="button" className="ghost-button studio-buy-button" onClick={handleOpenPurchaseConfirm}>
-                コインを購入する
-              </button>
-              <a
-                className="ghost-button studio-sparkmotion-button"
-                href={SPARKMOTION_URL}
-                target="_blank"
-                rel="noreferrer"
-              >
-                SparkMotionを使う
-              </a>
-            </div>
-          </div>
+    <div className="camera-app fastmove-shell video-studio-page">
+      <header className="fastmove-top">
+        <div>
+          <p>{pageEyebrow}</p>
+          <h1>{pageTitle}</h1>
+        </div>
+        <button
+          type="button"
+          className={`fastmove-menu-toggle${isMobileMenuOpen ? ' is-open' : ''}`}
+          onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+          aria-expanded={isMobileMenuOpen}
+          aria-label="メニューを開く"
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        <div className={`fastmove-top__actions${isMobileMenuOpen ? ' is-open' : ''}`} aria-label="生成モード切替">
+          <button
+            type="button"
+            className={`fastmove-link video-mode-link${isI2vMode ? ' is-active' : ''}`}
+            onClick={handleOpenVideo}
+            disabled={disableModeSwitch}
+          >
+            動画
+          </button>
+          <button
+            type="button"
+            className={`fastmove-link video-mode-link${!isI2vMode ? ' is-active' : ''}`}
+            onClick={() => {
+              setIsMobileMenuOpen(false)
+              setGenerationMode('qwen_edit')
+            }}
+            disabled={disableModeSwitch}
+          >
+            画像編集
+          </button>
+          <button
+            type="button"
+            className="fastmove-link"
+            onClick={handleOpenLipSync}
+            disabled={disableModeSwitch}
+          >
+            リップシンク
+          </button>
+          <a
+            href={SHOP_URL}
+            className="fastmove-link"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            ショップ
+          </a>
+          <button type="button" className="fastmove-ghost" onClick={handleSignOut}>
+            ログアウト
+          </button>
+        </div>
+        <button
+          type="button"
+          className={`fastmove-menu-backdrop${isMobileMenuOpen ? ' is-open' : ''}`}
+          onClick={() => setIsMobileMenuOpen(false)}
+          aria-label="メニューを閉じる"
+        />
+      </header>
 
-          <label className="studio-upload">
+      <section className="fastmove-account-row">
+        <div className="fastmove-account-user">
+          <strong>{session.user?.email ?? 'ログイン中'}</strong>
+          <span>ログイン中</span>
+        </div>
+        <div className="fastmove-account-side">
+          <div className={`fastmove-account-coins ${ticketStatus === 'error' ? 'is-error' : ''}`}>
+            {ticketStatus === 'loading' && 'トークン確認中...'}
+            {ticketStatus !== 'loading' && `トークン: ${ticketCount ?? 0}`}
+            {ticketStatus === 'error' && ticketMessage ? ` / ${ticketMessage}` : ''}
+          </div>
+          <div className="fastmove-bonus">
+            <button
+              type="button"
+              className="fastmove-bonus-button"
+              onClick={handleClaimDailyBonus}
+              disabled={bonusClaiming || bonusStatus === 'loading' || !bonusCanClaim}
+            >
+              {bonusClaiming ? '受け取り中...' : 'ログインボーナス'}
+            </button>
+            <small className="fastmove-bonus-hint">
+              {bonusStatus === 'loading' && '状態確認中...'}
+              {bonusStatus !== 'loading' && bonusCanClaim && '24時間ごとに受け取れます'}
+              {bonusStatus !== 'loading' && !bonusCanClaim && bonusNextEligibleAt && formatTimeUntilClaim(bonusNextEligibleAt)}
+              {bonusStatus !== 'loading' && !bonusCanClaim && !bonusNextEligibleAt && '24時間ごとに受け取れます'}
+            </small>
+            {bonusMessage && <small className="fastmove-bonus-msg">{bonusMessage}</small>}
+          </div>
+        </div>
+      </section>
+      {isI2vMode ? (
+      <div className="video-studio-layout fastmove-grid">
+        <section className="studio-block--input fastmove-card">
+          <h2>入力設定</h2>
+          <p className="fastmove-status">{durationHelpText}</p>
+          <div className="fastmove-field">
+            <span>元画像</span>
             <input
+              id={I2V_IMAGE_INPUT_ID}
               ref={sourceImageInputRef}
+              className="fastmove-file__native"
               type="file"
               accept="image/*"
               onChange={(event) => setSourceImageFile(event.target.files?.[0] || null)}
+              disabled={isRunning}
             />
-            <div className="studio-upload__inner">
-              <div className="studio-upload__icon" aria-hidden="true">
-                +
-              </div>
-              <div className="studio-upload__text">
-                <strong>{sourceImageFile?.name || '画像をアップロード'}</strong>
-                <span>JPG / PNG / WEBP</span>
-              </div>
-              <span className="studio-upload__chip">選択 / ドロップ</span>
-            </div>
-          </label>
+            <label
+              htmlFor={I2V_IMAGE_INPUT_ID}
+              className={`fastmove-file-picker ${sourceImageFile ? 'is-selected' : ''} ${isRunning ? 'is-disabled' : ''}`.trim()}
+            >
+              <span className="fastmove-file-picker__badge">画像</span>
+              <span className="fastmove-file-picker__title">{sourceImageFile ? '画像を変更' : '画像を選択'}</span>
+              <span className="fastmove-file-picker__meta">JPG / PNG / WEBP</span>
+            </label>
+            <small>{sourceImageFile ? sourceImageFile.name : '画像を選択してください'}</small>
+          </div>
 
           {sourceImagePreview && (
             <figure className="studio-thumb">
-              <img src={sourceImagePreview} alt="Uploaded image preview" />
+              <img src={sourceImagePreview} alt="アップロード画像プレビュー" />
               <button
                 type="button"
                 className="studio-thumb__remove"
@@ -1105,12 +1263,12 @@ export function Camera() {
                 }}
                 aria-label="画像を削除"
               >
-                ×
+                x
               </button>
             </figure>
           )}
 
-          <label className="studio-field">
+          <label className="fastmove-field">
             <span>プロンプト</span>
             <textarea
               rows={4}
@@ -1122,7 +1280,7 @@ export function Camera() {
             <small>{`${prompt.length}/${PROMPT_MAX_LENGTH}`}</small>
           </label>
 
-          <label className="studio-field studio-field--sub">
+          <label className="fastmove-field">
             <span>ネガティブプロンプト</span>
             <textarea
               rows={3}
@@ -1131,29 +1289,35 @@ export function Camera() {
             />
           </label>
 
-          <label className="studio-field studio-field--sub">
-            <span>CFG</span>
-            <input
-              type="range"
-              min={CFG_MIN}
-              max={CFG_MAX}
-              step={CFG_STEP}
-              value={cfg}
-              onChange={(event) => setCfg(Number(event.target.value))}
-              disabled={isRunning}
-            />
-            <small>{`現在: ${cfg.toFixed(1)}`}</small>
-            <small>CFGはプロンプトの効きやすさです。</small>
+          <label className="fastmove-field fastmove-field--compact">
+            <span>動画モデル</span>
+            <div className="fastmove-quality" role="group" aria-label="動画モデル">
+              {VIDEO_MODEL_ORDER.map((modelId) => {
+                const model = VIDEO_MODELS[modelId]
+                return (
+                  <button
+                    key={model.id}
+                    type="button"
+                    className={`fastmove-quality__btn${videoModel === model.id ? ' is-active' : ''}`}
+                    onClick={() => setVideoModel(model.id)}
+                    disabled={isRunning}
+                  >
+                    {model.label}
+                  </button>
+                )
+              })}
+            </div>
+            <small>{selectedVideoModelDescription}</small>
           </label>
 
-          <label className="studio-field studio-field--sub">
-            <span>画質</span>
-            <div className="studio-quality-buttons" role="group" aria-label="画質選択">
+          <label className="fastmove-field fastmove-field--compact">
+            <span>画質プリセット</span>
+            <div className="fastmove-quality" role="group" aria-label="画質プリセット">
               {QUALITY_PRESETS.map((preset, index) => (
                 <button
                   key={preset.key}
                   type="button"
-                  className={`studio-quality-buttons__btn${index === qualityIndex ? ' is-active' : ''}`}
+                  className={`fastmove-quality__btn${index === qualityIndex ? ' is-active' : ''}`}
                   onClick={() => setQualityIndex(index)}
                   disabled={isRunning}
                 >
@@ -1161,88 +1325,76 @@ export function Camera() {
                 </button>
               ))}
             </div>
-            <small>{`現在: ${selectedQualityWithCost}`}</small>
+            <small>{qualityDescription}</small>
           </label>
 
-          <div className="studio-engine">
-            <span className="studio-engine__label">動画スタイル</span>
-            <label className="studio-switch">
-              <input
-                type="checkbox"
-                checked={videoEngine === 'rapid'}
-                onChange={(event) => setVideoEngine(event.target.checked ? 'rapid' : 'remix')}
+          <label className="fastmove-field fastmove-field--compact">
+            <span>長さ</span>
+            <div className="fastmove-quality" role="group" aria-label="動画の長さ">
+              <button
+                type="button"
+                className={`fastmove-quality__btn${durationSeconds === 6 ? ' is-active' : ''}`}
+                onClick={() => setDurationSeconds(6)}
                 disabled={isRunning}
-              />
-              <span className="studio-switch__track" aria-hidden="true" />
-              <strong>{videoEngine === 'rapid' ? '動き重視' : '安定重視'}</strong>
-            </label>
-          </div>
-
-          <div className="studio-actions">
-            <button type="button" className="primary-button" onClick={handleGenerate} disabled={!canGenerate}>
-              {isRunning ? '生成中...' : '動画を生成'}
-            </button>
-            <small>{`コイン消費は画質に応じて変わります（現在: ${selectedQualityWithCost}）`}</small>
-          </div>
-
-          <section className="studio-credit-box">
-            <header>
-              <h3>デイリーコイン</h3>
-              <span className={`studio-bonus-pill${bonusCanClaim ? ' is-ready' : ''}`}>
-                {bonusStatus === 'loading' && 'ステータス更新中'}
-                {bonusStatus !== 'loading' && bonusCanClaim && '今すぐ受け取り可能'}
-                {bonusStatus !== 'loading' && !bonusCanClaim && bonusNextEligibleAt && formatTimeUntilClaim(bonusNextEligibleAt)}
-              </span>
-            </header>
-            <div className={`studio-bonus-panel${bonusRouletteRolling ? ' is-rolling' : ''}`} aria-live="polite">
-              <div className="studio-bonus-panel__icon">COIN</div>
-              <div className="studio-bonus-panel__meta">
-                <strong>{bonusRouletteRolling ? '付与処理中...' : '24時間ごとに1コインを受け取れます'}</strong>
-                <span>
-                  {bonusCanClaim ? 'ログイン中なら毎日1回受け取れます' : '次回の受け取りまでクールタイムがあります'}
-                </span>
-                {bonusRouletteAwarded !== null && <span>今回の付与 +{bonusRouletteAwarded}コイン</span>}
-              </div>
+              >
+                6s
+              </button>
+              <button
+                type="button"
+                className={`fastmove-quality__btn${durationSeconds === 8 ? ' is-active' : ''}`}
+                onClick={() => setDurationSeconds(8)}
+                disabled={isRunning}
+              >
+                8s
+              </button>
+              <button
+                type="button"
+                className={`fastmove-quality__btn${durationSeconds === 10 ? ' is-active' : ''}`}
+                onClick={() => setDurationSeconds(10)}
+                disabled={isRunning || !isPremium}
+              >
+                10s
+              </button>
             </div>
-            <button
-              type="button"
-              className="primary-button"
-              onClick={handleClaimDailyBonus}
-              disabled={bonusClaiming || bonusStatus === 'loading' || !bonusCanClaim}
-            >
-              {bonusClaiming ? 'コインを受け取り中...' : 'ログインボーナスを受け取る'}
+            {!isPremium && <small>{PREMIUM_10S_ONLY_MESSAGE}</small>}
+          </label>
+
+          <div className="fastmove-cost">
+            <strong>{`消費トークン: ${totalTicketCost}枚`}</strong>
+            <small>{`内訳: 画質 ${selectedQuality.cost}枚 + 長さ ${durationTicketCost}枚`}</small>
+          </div>
+
+          <div className="fastmove-actions">
+            <button type="button" className="fastmove-primary" onClick={handleGenerate} disabled={!canGenerate}>
+              {isRunning ? '生成中...' : `動画を生成 (${totalTicketCost}枚)`}
             </button>
-            {bonusMessage && <p className="studio-credit-msg">{bonusMessage}</p>}
-          </section>
+            <small>{`現在の設定: ${selectedQualityWithCost} / ${durationSeconds}秒`}</small>
+          </div>
+
         </section>
 
-        <section className="studio-block studio-block--output" style={viewerStyle}>
-          <header className="studio-output-head">
+        <section className="studio-block--output fastmove-card" style={viewerStyle}>
+          <header className="fastmove-output-head">
             <div>
               <h2>生成結果</h2>
               {statusMessage && !isRunning && <span>{statusMessage}</span>}
             </div>
             {canDownload && (
-              <button type="button" className="ghost-button" onClick={handleDownload}>
-                Save
+              <button type="button" className="fastmove-ghost" onClick={handleDownload}>
+                保存
               </button>
             )}
           </header>
 
-          <div className="studio-progress" aria-hidden="true">
-            <span />
-          </div>
-
-          <div className="studio-stage">
+          <div className="fastmove-output">
             {isRunning ? (
-              <div className="studio-loading" role="status" aria-live="polite">
-                <div className="studio-loading__bars" aria-hidden="true">
+              <div className="fastmove-loading" role="status" aria-live="polite">
+                <div className="fastmove-loading__dots" aria-hidden="true">
                   <span />
                   <span />
                   <span />
                 </div>
-                <strong>生成中...</strong>
-                <p>1〜2分ほどかかる場合があります。</p>
+                <p>生成中...</p>
               </div>
             ) : displayVideo ? (
               isGif ? (
@@ -1251,14 +1403,14 @@ export function Camera() {
                 <video controls src={displayVideo} />
               )
             ) : (
-              <div className="studio-empty">左側で画像とプロンプトを設定するとここに表示されます。</div>
+              <p>ここに生成動画が表示されます。</p>
             )}
           </div>
         </section>
       </div>
       ) : (
         <div className="studio-qwen-wrap">
-          <SparkArtQwen
+          <QwenEditPanel
             generationMode={generationMode}
             onChangeMode={setGenerationMode}
             accessToken={accessToken}
@@ -1279,25 +1431,17 @@ export function Camera() {
             onEnsureTickets={ensureTicketsForGeneration}
             onTicketShortage={() => setShowTicketModal(true)}
             onTicketCountUpdate={(nextCount) => setTicketCount(nextCount)}
+            onOpenFastMove={handleOpenFastMove}
+            onOpenLipSync={handleOpenLipSync}
           />
         </div>
       )}
 
-      <section className="studio-logout-bar">
-        <div>
-          <strong>{session.user?.email ?? 'ログイン中'}</strong>
-          <span>ログイン中</span>
-        </div>
-        <button type="button" className="ghost-button" onClick={handleSignOut}>
-          ログアウト
-        </button>
-      </section>
-
       {showTicketModal && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-card">
-            <h3>コイン不足</h3>
-            <p>この設定の{generationLabel}には{selectedTicketCost}コインが必要です。</p>
+            <h3>トークン不足</h3>
+            <p>{`この設定の${generationLabel}には${selectedTicketCost}枚必要です。`}</p>
             <div className="modal-actions">
               <button type="button" className="primary-button" onClick={() => setShowTicketModal(false)}>
                 閉じる
@@ -1309,7 +1453,7 @@ export function Camera() {
       {isI2vMode && errorModalMessage && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-card">
-            <h3>リクエストが拒否されました</h3>
+            <h3>生成エラー</h3>
             <p>{errorModalMessage}</p>
             <div className="modal-actions">
               <button type="button" className="primary-button" onClick={() => setErrorModalMessage(null)}>
@@ -1323,10 +1467,10 @@ export function Camera() {
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-card">
             <h3>購入ページへ移動</h3>
-            <p>購入ページに移動します。表示されたページで再度ログインしてください。購入ページで購入したコインは即座にSpark Artにも反映されます。</p>
+            <p>新しいタブで購入ページを開きます。必要に応じて再ログインしてください。</p>
             <div className="modal-actions">
               <button type="button" className="primary-button" onClick={handleConfirmPurchaseMove}>
-                はい
+                移動する
               </button>
               <button type="button" className="ghost-button" onClick={() => setShowPurchaseConfirmModal(false)}>
                 キャンセル
