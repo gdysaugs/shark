@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 
+const BOARD_URL = 'https://civitai.uk/'
+
 export function TopNav() {
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
@@ -40,6 +42,14 @@ export function TopNav() {
           rel='noopener noreferrer'
         >
           ショップ
+        </a>
+        <a
+          href={BOARD_URL}
+          className='top-nav__link'
+          target='_blank'
+          rel='noopener noreferrer'
+        >
+          掲示板
         </a>
       </nav>
     </header>
