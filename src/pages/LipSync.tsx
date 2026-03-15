@@ -33,8 +33,7 @@ const API_ENDPOINT = '/api/lipsync'
 const OAUTH_REDIRECT_URL = getOAuthRedirectUrl()
 const SHOP_URL = 'https://gettoken.uk/purchage/'
 const BOARD_URL = 'https://civitai.uk/'
-const NON_PREMIUM_MAX_TEXT_LENGTH = 30
-const PREMIUM_MAX_TEXT_LENGTH = 100
+const MAX_TEXT_LENGTH = 100
 const LIPSYNC_BASE_REQUIRED_TICKETS = 2
 const LIPSYNC_LONG_TEXT_REQUIRED_TICKETS = 3
 const LIPSYNC_LONG_TEXT_THRESHOLD = 60
@@ -43,8 +42,6 @@ const MAX_REF_VIDEO_MB = 20
 const MAX_REF_AUDIO_MB = 5
 const MAX_TTS_AUDIO_SECONDS = 30
 const MIN_VIDEO_SECONDS = 3
-const PREMIUM_UPLOAD_ONLY_MESSAGE =
-  '参考音声アップロードはプレミアム限定です。アップロードした音声または動画の声を称してボイスクローン出来ます。'
 const DEFAULT_PADS = 4
 const DEFAULT_FACE_MODE = 0
 const DEFAULT_RESIZE_FACTOR = 1
@@ -880,7 +877,6 @@ export function LipSync() {
   const [resultVideo, setResultVideo] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [ticketCount, setTicketCount] = useState<number | null>(null)
-  const [isPremium, setIsPremium] = useState(false)
   const [ticketStatus, setTicketStatus] = useState<TicketStatus>('idle')
   const [ticketMessage, setTicketMessage] = useState('')
   const [bonusStatus, setBonusStatus] = useState<BonusStatus>('idle')
@@ -896,7 +892,7 @@ export function LipSync() {
   const requiredTickets = resolveRequiredTickets(dialogue)
   const isTokenInsufficient = ticketCount !== null && ticketCount < requiredTickets
   const selectedSovitsPreset = SOVITS_PRESETS.find((preset) => preset.id === sovitsPresetId) ?? SOVITS_PRESETS[0]
-  const maxDialogueLength = isPremium ? PREMIUM_MAX_TEXT_LENGTH : NON_PREMIUM_MAX_TEXT_LENGTH
+  const maxDialogueLength = MAX_TEXT_LENGTH
   const customAudioPreviewFile = customAudioSourceFile ?? customAudioFile
   const customAudioPreviewName = customAudioPreviewFile?.name ?? ''
   const customAudioPreviewSizeMb = customAudioPreviewFile ? (customAudioPreviewFile.size / 1024 / 1024).toFixed(2) : ''
@@ -964,16 +960,9 @@ export function LipSync() {
       }
 
       const nextCount = Number(data?.tickets ?? 0)
-      const nextIsPremium = Boolean(data?.isPremium)
       setTicketStatus('idle')
       setTicketMessage('')
       setTicketCount(nextCount)
-      setIsPremium(nextIsPremium)
-      if (!nextIsPremium) {
-        setCustomAudioFile(null)
-        setCustomAudioSourceFile(null)
-        setIsPreparingCustomAudio(false)
-      }
       return nextCount
     },
     [getLatestAccessToken],
@@ -1070,7 +1059,6 @@ export function LipSync() {
     if (!accessToken) {
       setTicketStatus('idle')
       setTicketCount(null)
-      setIsPremium(false)
       setTicketMessage('')
       setBonusStatus('idle')
       setBonusCanClaim(false)
@@ -1167,11 +1155,6 @@ export function LipSync() {
 
   const handleCustomAudioChange = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
-      if (!isPremium) {
-        event.target.value = ''
-        setStatusMessage(PREMIUM_UPLOAD_ONLY_MESSAGE)
-        return
-      }
       const selectedFile = event.target.files?.[0] ?? null
       if (!selectedFile) {
         setCustomAudioFile(null)
@@ -1199,7 +1182,7 @@ export function LipSync() {
       setStatusMessage('')
       return
     },
-    [isPremium],
+    [],
   )
 
   const handleClearCustomAudio = useCallback(() => {
@@ -1366,10 +1349,6 @@ export function LipSync() {
       return
     }
     const useUploadedAudio = Boolean(customAudioSourceFile)
-    if (useUploadedAudio && !isPremium) {
-      setStatusMessage(PREMIUM_UPLOAD_ONLY_MESSAGE)
-      return
-    }
     const trimmedDialogue = dialogue.trim()
     const selectedPresetId = String(selectedSovitsPreset?.id || '').trim().toLowerCase()
     const presetReferenceTranscript = useUploadedAudio ? '' : String(selectedSovitsPreset?.refText || '').trim()
@@ -1607,7 +1586,6 @@ export function LipSync() {
     keepOriginalAudio,
     generatedAudioMixVolume,
     originalAudioMixVolume,
-    isPremium,
     ticketCount,
     session,
     submitJob,
@@ -1678,7 +1656,6 @@ export function LipSync() {
     await signOutSafely()
     setSession(null)
     setTicketCount(null)
-    setIsPremium(false)
     setTicketStatus('idle')
     setTicketMessage('')
     setBonusStatus('idle')
@@ -1844,19 +1821,18 @@ export function LipSync() {
               type='file'
               accept='audio/*,video/mp4,video/webm,video/quicktime,video/x-matroska,.wav,.mp3,.m4a,.aac,.ogg,.flac,.mp4,.webm,.mov,.mkv'
               onChange={handleCustomAudioChange}
-              disabled={isRunning || !isPremium}
+              disabled={isRunning}
             />
             <label
               htmlFor={AUDIO_INPUT_ID}
-              className={`lipsync-file-picker ${customAudioPreviewFile ? 'is-selected' : ''} ${isRunning || !isPremium ? 'is-disabled' : ''}`.trim()}
+              className={`lipsync-file-picker ${customAudioPreviewFile ? 'is-selected' : ''} ${isRunning ? 'is-disabled' : ''}`.trim()}
             >
               <span className='lipsync-file-picker__badge'>音声/動画</span>
               <span className='lipsync-file-picker__title'>
-                {!isPremium ? 'プレミアム限定' : customAudioPreviewFile ? 'ファイルを変更' : 'ファイルを選択'}
+                {customAudioPreviewFile ? 'ファイルを変更' : 'ファイルを選択'}
               </span>
               <span className='lipsync-file-picker__meta'>WAV / MP3 / M4A / AAC / OGG / FLAC / MP4 / WEBM / MOV / MKV</span>
             </label>
-            {!isPremium && <small>{PREMIUM_UPLOAD_ONLY_MESSAGE}</small>}
             {customAudioPreviewFile && (
               <div className='lipsync-ref-preview'>
                 <button

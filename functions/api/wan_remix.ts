@@ -122,8 +122,6 @@ const DEFAULT_WIDTH = 768
 const DEFAULT_HEIGHT = 448
 const UNDERAGE_BLOCK_MESSAGE =
   'この画像には暴力的な表現、低年齢、または規約違反の可能性があります。別の画像でお試しください。'
-const PREMIUM_USAGE_ID_PREFIX = 'premium_status:'
-const PREMIUM_10S_ONLY_MESSAGE = '10秒動画はプレミアム限定です。'
 
 type WorkflowFlavor = 'rapid' | 'rapid_fastmove' | 'smoothmix' | 'remix'
 
@@ -305,25 +303,6 @@ const ensureTicketAvailable = async (
   }
 
   return { existing }
-}
-
-const fetchPremiumStatus = async (
-  admin: ReturnType<typeof createClient>,
-  user: User,
-  corsHeaders: HeadersInit = {},
-) => {
-  const usageId = `${PREMIUM_USAGE_ID_PREFIX}${user.id}`
-  const { data, error } = await admin
-    .from('ticket_events')
-    .select('delta')
-    .eq('usage_id', usageId)
-    .maybeSingle()
-
-  if (error) {
-    return { response: internalErrorResponse(corsHeaders) }
-  }
-
-  return { isPremium: Number(data?.delta || 0) > 0 }
 }
 
 const consumeTicket = async (
@@ -933,14 +912,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const requestedWidth = Math.floor(Number(input?.width ?? DEFAULT_WIDTH))
   const requestedHeight = Math.floor(Number(input?.height ?? DEFAULT_HEIGHT))
   const seconds = normalizeSeconds(input?.seconds ?? DEFAULT_SECONDS)
-  const premium = await fetchPremiumStatus(auth.admin, auth.user, corsHeaders)
-  if ('response' in premium) {
-    return premium.response
-  }
-  const isPremium = premium.isPremium
-  if (seconds >= 10 && !isPremium) {
-    return jsonResponse({ error: PREMIUM_10S_ONLY_MESSAGE }, 403, corsHeaders)
-  }
   const fps = normalizeFps(input?.fps)
   const ticketCost = ticketCostForFps(fps) + ticketCostForSeconds(seconds)
   const numFrames =

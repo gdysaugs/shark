@@ -7,7 +7,6 @@ type Env = {
 }
 
 const SIGNUP_TICKET_GRANT = 5
-const PREMIUM_USAGE_ID_PREFIX = 'premium_status:'
 const INTERNAL_ERROR_MESSAGE = 'エラーです。やり直してください。'
 
 const corsMethods = 'GET, OPTIONS'
@@ -110,22 +109,6 @@ const ensureTicketRow = async (
   return { data: inserted, error: null, created: true }
 }
 
-const fetchPremiumStatus = async (
-  admin: ReturnType<typeof createClient>,
-  user: User,
-) => {
-  const usageId = `${PREMIUM_USAGE_ID_PREFIX}${user.id}`
-  const { data, error } = await admin
-    .from('ticket_events')
-    .select('delta')
-    .eq('usage_id', usageId)
-    .maybeSingle()
-  if (error) {
-    return { isPremium: false, error }
-  }
-  return { isPremium: Number(data?.delta || 0) > 0, error: null }
-}
-
 const requireAuthenticatedUser = async (request: Request, env: Env, corsHeaders: HeadersInit) => {
   const token = extractBearerToken(request)
   if (!token) {
@@ -172,13 +155,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     return jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 500, corsHeaders)
   }
 
-  const premium = await fetchPremiumStatus(auth.admin, auth.user)
-  if (premium.error) {
-    return jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 500, corsHeaders)
-  }
-
   return jsonResponse(
-    { tickets: data?.tickets ?? 0, hasRecord: Boolean(data), isPremium: premium.isPremium },
+    { tickets: data?.tickets ?? 0, hasRecord: Boolean(data), isPremium: true },
     200,
     corsHeaders,
   )

@@ -47,8 +47,7 @@ const MAX_SOVITS_TEMPERATURE = 2
 const DEFAULT_W2L_CHECKPOINT = 'checkpoints/wav2lip_gan.onnx'
 const DEFAULT_W2L_ENHANCER = 'codeformer'
 const DEFAULT_W2L_BLENDING = 6
-const NON_PREMIUM_MAX_TEXT_LENGTH = 30
-const PREMIUM_MAX_TEXT_LENGTH = 100
+const MAX_TEXT_LENGTH = 100
 const MAX_VIDEO_BYTES = 80 * 1024 * 1024
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024
 const MAX_REF_AUDIO_BYTES = 5 * 1024 * 1024
@@ -67,9 +66,6 @@ const LIPSYNC_LONG_TEXT_TICKET_COST = 3
 const LIPSYNC_LONG_TEXT_THRESHOLD = 60
 const LIPSYNC_VIDEO_STAGE_TICKET_COST = 1
 const LIPSYNC_TTS_USAGE_PREFIX = "lipsync:tts:"
-const PREMIUM_USAGE_ID_PREFIX = 'premium_status:'
-const PREMIUM_UPLOAD_ONLY_MESSAGE =
-  '参考音声アップロードはプレミアム限定です。アップロードした音声または動画の声を称してボイスクローン出来ます。'
 const DEFAULT_R2_PUBLIC_BASE_URL = 'https://pub-899ab9de55a1446ca40d9795dce93fa6.r2.dev'
 const FALLBACK_SOVITS_ENDPOINT = 'https://api.runpod.ai/v2/5uvujcc8baqwu1'
 const FALLBACK_LIPSYNC_ENDPOINT = 'https://api.runpod.ai/v2/mifzq3lqydu04d'
@@ -490,23 +486,6 @@ const ensureTicketAvailable = async (
   }
 
   return { existing }
-}
-
-const fetchPremiumStatus = async (
-  admin: ReturnType<typeof createClient>,
-  user: User,
-  corsHeaders: HeadersInit = {},
-) => {
-  const usageId = `${PREMIUM_USAGE_ID_PREFIX}${user.id}`
-  const { data, error } = await admin
-    .from('ticket_events')
-    .select('delta')
-    .eq('usage_id', usageId)
-    .maybeSingle()
-  if (error) {
-    return { response: internalErrorResponse(corsHeaders) }
-  }
-  return { isPremium: Number(data?.delta || 0) > 0 }
 }
 
 const consumeTicket = async (
@@ -959,13 +938,13 @@ const resolveRequiredTicketsByStage = (stage: Stage, dialogueLength: number) => 
 const buildTtsInput = async (
   input: Record<string, unknown>,
   env: Env,
-  options: { requestOrigin: string; isPremium: boolean },
+  options: { requestOrigin: string },
 ) => {
   const ttsProbeOnly = parseBoolean(input.tts_probe_only ?? input.prompt_probe_only, false)
   const baseText = String(input.text ?? input.tts_text ?? '').trim()
   const probeText = String(input.tts_probe_text ?? DEFAULT_TTS_PROBE_TEXT).trim() || DEFAULT_TTS_PROBE_TEXT
   const text = ttsProbeOnly ? probeText.slice(0, MAX_TTS_PROBE_TEXT_LENGTH) : baseText
-  const maxTextLength = options.isPremium ? PREMIUM_MAX_TEXT_LENGTH : NON_PREMIUM_MAX_TEXT_LENGTH
+  const maxTextLength = MAX_TEXT_LENGTH
   if (!text) {
     throw new Error('text is required.')
   }
@@ -1009,22 +988,10 @@ const buildTtsInput = async (
     refName = sanitizeUploadName(presetFilename, refName)
   }
 
-  if (!options.isPremium) {
-    if (refAudioSource === 'upload') {
-      throw new Error(PREMIUM_UPLOAD_ONLY_MESSAGE)
-    }
-    if (!presetRefId) {
-      throw new Error(PREMIUM_UPLOAD_ONLY_MESSAGE)
-    }
-  }
-
   if (!refAudioUrl) {
     const rawRefAudio = input.ref_audio_base64 ?? input.ref_audio ?? input.ref_audio_data
     const hasCustomRefAudio = typeof rawRefAudio === 'string' && rawRefAudio.trim().length > 0
     if (hasCustomRefAudio) {
-      if (!options.isPremium) {
-        throw new Error(PREMIUM_UPLOAD_ONLY_MESSAGE)
-      }
       const refAudioExt = normalizeExt(input.ref_audio_ext, extFromFilename(refName, '.wav'))
       const refAudioBase64 = ensureBase64Input('ref_audio', rawRefAudio, MAX_REF_AUDIO_BYTES)
       if (!shouldUploadMedia) {
@@ -1404,11 +1371,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (linkedTtsUsage && 'response' in linkedTtsUsage) {
     return linkedTtsUsage.response
   }
-  const premium = await fetchPremiumStatus(auth.admin, auth.user, corsHeaders)
-  if ('response' in premium) {
-    return premium.response
-  }
-  const isPremium = premium.isPremium
   const endpoint = resolveEndpoint(env, stage)
   if (!endpoint) {
     return jsonResponse({ error: 'サーバー設定エラーです。' }, 500, corsHeaders)
@@ -1424,7 +1386,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       stage === 'tts'
         ? await buildTtsInput(inputObj, env, {
             requestOrigin: new URL(request.url).origin,
-            isPremium,
           })
         : await buildLipSyncInput(inputObj, env)
   } catch (error) {

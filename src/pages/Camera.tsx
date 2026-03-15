@@ -79,7 +79,6 @@ const I2V_IMAGE_INPUT_ID = 'video-i2v-image-file'
 const COIN_PURCHASE_URL = 'https://checkoutcoins2.win/purchase.html'
 const SHOP_URL = 'https://gettoken.uk/purchage/'
 const BOARD_URL = 'https://civitai.uk/'
-const PREMIUM_10S_ONLY_MESSAGE = '10秒はプレミアム限定です。'
 const parseVideoModel = (value: string | null): VideoModel =>
   value && value.toLowerCase() in VIDEO_MODELS ? (value.toLowerCase() as VideoModel) : DEFAULT_VIDEO_MODEL
 
@@ -390,7 +389,6 @@ export function Camera() {
   const [session, setSession] = useState<Session | null>(null)
   const [authReady, setAuthReady] = useState(!supabase)
   const [ticketCount, setTicketCount] = useState<number | null>(null)
-  const [isPremium, setIsPremium] = useState(false)
   const [ticketStatus, setTicketStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [ticketMessage, setTicketMessage] = useState('')
   const [showTicketModal, setShowTicketModal] = useState(false)
@@ -427,9 +425,7 @@ export function Camera() {
   const generationLabel = isI2vMode ? '動画生成' : '画像生成'
   const selectedTicketCost = isI2vMode ? totalTicketCost : 1
   const canGenerate = prompt.trim().length > 0 && Boolean(sourceImageFile) && !isRunning
-  const durationHelpText = isPremium
-    ? '1枚の画像から 6秒 / 8秒 / 10秒 の動画を生成できます。'
-    : '1枚の画像から 6秒 / 8秒 の動画を生成できます（10秒はプレミアム限定）。';
+  const durationHelpText = '1枚の画像から 6秒 / 8秒 / 10秒 の動画を生成できます。'
 
   const getLatestAccessToken = useCallback(async () => {
     if (!supabase) return accessToken
@@ -602,14 +598,9 @@ export function Camera() {
         return null
       }
       const nextCount = Number(data?.tickets ?? 0)
-      const nextIsPremium = Boolean(data?.isPremium)
       setTicketStatus('idle')
       setTicketMessage('')
       setTicketCount(nextCount)
-      setIsPremium(nextIsPremium)
-      if (!nextIsPremium) {
-        setDurationSeconds((prev) => (prev === 10 ? 8 : prev))
-      }
       return nextCount
     },
     [getLatestAccessToken],
@@ -636,7 +627,6 @@ export function Camera() {
   useEffect(() => {
     if (!session || !accessToken) {
       setTicketCount(null)
-      setIsPremium(false)
       setTicketStatus('idle')
       setTicketMessage('')
       setBonusStatus('idle')
@@ -781,10 +771,6 @@ export function Camera() {
       setStatusMessage('トークンを確認中...')
       return false
     }
-    if (durationSeconds >= 10 && !isPremium) {
-      setStatusMessage(PREMIUM_10S_ONLY_MESSAGE)
-      return false
-    }
     const token = accessToken || (await getLatestAccessToken())
     if (token) {
       setStatusMessage('トークンを確認中...')
@@ -798,7 +784,7 @@ export function Camera() {
     setStatusMessage('セッション確認に失敗しました。再ログインしてください。')
     setSession(null)
     return false
-  }, [accessToken, durationSeconds, fetchTickets, getLatestAccessToken, isPremium, selectedTicketCost, session, ticketStatus])
+  }, [accessToken, fetchTickets, getLatestAccessToken, selectedTicketCost, session, ticketStatus])
 
   const startBatch = useCallback(async () => {
     const hasTicket = await ensureTicketsForGeneration()
@@ -944,7 +930,6 @@ export function Camera() {
     await signOutSafely()
     setSession(null)
     setTicketCount(null)
-    setIsPremium(false)
     setTicketStatus('idle')
     setTicketMessage('')
     setBonusStatus('idle')
@@ -1361,12 +1346,11 @@ export function Camera() {
                 type="button"
                 className={`fastmove-quality__btn${durationSeconds === 10 ? ' is-active' : ''}`}
                 onClick={() => setDurationSeconds(10)}
-                disabled={isRunning || !isPremium}
+                disabled={isRunning}
               >
                 10s
               </button>
             </div>
-            {!isPremium && <small>{PREMIUM_10S_ONLY_MESSAGE}</small>}
           </label>
 
           <div className="fastmove-cost">

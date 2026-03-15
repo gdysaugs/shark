@@ -53,7 +53,6 @@ const QUALITY_PRESETS: readonly QualityPreset[] = [
 ] as const
 const DEFAULT_QUALITY_INDEX = 1
 const DEFAULT_IMAGE_INPUT_ID = 'fastmove-image-file'
-const PREMIUM_10S_ONLY_MESSAGE = '10秒はプレミアム限定です。'
 const durationTicketCostMap: Record<DurationSeconds, number> = {
   6: 1,
   8: 2,
@@ -300,7 +299,6 @@ export function FastMove({
   const [resultVideo, setResultVideo] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [ticketCount, setTicketCount] = useState<number | null>(null)
-  const [isPremium, setIsPremium] = useState(false)
   const [ticketStatus, setTicketStatus] = useState<TicketStatus>('idle')
   const [ticketMessage, setTicketMessage] = useState('')
   const [bonusStatus, setBonusStatus] = useState<BonusStatus>('idle')
@@ -314,12 +312,10 @@ export function FastMove({
 
   const accessToken = session?.access_token ?? ''
   const selectedQuality = QUALITY_PRESETS[qualityIndex] ?? QUALITY_PRESETS[DEFAULT_QUALITY_INDEX]
-  const canGenerate = Boolean(sourceImageFile && prompt.trim().length > 0 && !isRunning && (durationSeconds < 10 || isPremium))
+  const canGenerate = Boolean(sourceImageFile && prompt.trim().length > 0 && !isRunning)
   const durationTicketCost = durationTicketCostMap[durationSeconds]
   const totalTicketCost = selectedQuality.ticketCost + durationTicketCost
-  const durationHelpText = isPremium
-    ? '1枚の画像から6秒・8秒・10秒の動画を生成できます。'
-    : '1枚の画像から6秒・8秒の動画を生成できます（10秒はプレミアム限定）。'
+  const durationHelpText = '1枚の画像から6秒・8秒・10秒の動画を生成できます。'
 
   const getLatestAccessToken = useCallback(async () => {
     if (!supabase) return accessToken
@@ -376,14 +372,9 @@ export function FastMove({
       }
 
       const nextCount = Number(data?.tickets ?? 0)
-      const nextIsPremium = Boolean(data?.isPremium)
       setTicketStatus('idle')
       setTicketMessage('')
       setTicketCount(nextCount)
-      setIsPremium(nextIsPremium)
-      if (!nextIsPremium) {
-        setDurationSeconds((prev) => (prev === 10 ? 8 : prev))
-      }
       return nextCount
     },
     [getLatestAccessToken],
@@ -490,7 +481,6 @@ export function FastMove({
     if (!accessToken) {
       setTicketStatus('idle')
       setTicketCount(null)
-      setIsPremium(false)
       setTicketMessage('')
       setBonusStatus('idle')
       setBonusCanClaim(false)
@@ -647,10 +637,6 @@ export function FastMove({
       setStatusMessage('プロンプトを入力してください。')
       return
     }
-    if (durationSeconds >= 10 && !isPremium) {
-      setStatusMessage(PREMIUM_10S_ONLY_MESSAGE)
-      return
-    }
     if (prompt.length > MAX_PROMPT_LENGTH) {
       setStatusMessage(`プロンプトは ${MAX_PROMPT_LENGTH} 文字以内にしてください。`)
       return
@@ -694,7 +680,7 @@ export function FastMove({
         }
       }
     }
-  }, [accessToken, durationSeconds, fetchTickets, isPremium, isRunning, pageTitle, pollJob, prompt, session, sourceImageFile, submitJob])
+  }, [accessToken, durationSeconds, fetchTickets, isRunning, pageTitle, pollJob, prompt, session, sourceImageFile, submitJob])
 
   const handleGoogleSignIn = useCallback(async () => {
     const authConfigured = await ensureAuthConfigured()
@@ -756,7 +742,6 @@ export function FastMove({
     await signOutSafely()
     setSession(null)
     setTicketCount(null)
-    setIsPremium(false)
     setTicketStatus('idle')
     setTicketMessage('')
     setBonusStatus('idle')
@@ -986,12 +971,11 @@ export function FastMove({
                 type='button'
                 className={`fastmove-quality__btn${durationSeconds === 10 ? ' is-active' : ''}`}
                 onClick={() => setDurationSeconds(10)}
-                disabled={isRunning || !isPremium}
+                disabled={isRunning}
               >
                 10s
               </button>
             </div>
-            {!isPremium && <small>{PREMIUM_10S_ONLY_MESSAGE}</small>}
           </label>
 
           <div className='fastmove-cost'>
