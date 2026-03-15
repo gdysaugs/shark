@@ -7,7 +7,7 @@ import './guest-intro.css'
 
 const HERO_BANNER_IMAGE = '/media/shark-hero-banner-20260314.png?v=20260314-2'
 const HERO_SUB_BANNER_IMAGE = '/media/hero-sub-banner-20260314.png?v=20260314-1'
-const VIDEO_6S = '/media/landing-sample-6s.mp4?v=20260314-1'
+const VIDEO_6S = '/media/landing-sample-6s.mp4?v=20260316-1'
 const VIDEO_8S = '/media/landing-sample-8s.mp4?v=20260314-1'
 const VIDEO_10S = '/media/landing-sample-10s-v2.mp4?v=20260315-1'
 const VIDEO_LIPSYNC_SAMPLE = '/media/landing-sample-lipsync-12.mp4?v=20260314-1'
