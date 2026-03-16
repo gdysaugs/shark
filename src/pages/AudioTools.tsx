@@ -5,7 +5,6 @@ import './audioTools.css'
 
 const MAX_VIDEO_MB = 120
 const MIN_TRIM_SECONDS = 0.1
-const BOARD_URL = 'https://civitai.uk/'
 const FFMPEG_CORE_CANDIDATES = [
   {
     coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js',
@@ -301,7 +300,6 @@ export function AudioTools() {
           <a href='/video' className='audio-tools-link' onClick={() => setIsMobileMenuOpen(false)}>V4</a>
           <a href='/lipsync' className='audio-tools-link' onClick={() => setIsMobileMenuOpen(false)}>LipSync</a>
           <a href='/video?mode=edit' className='audio-tools-link' onClick={() => setIsMobileMenuOpen(false)}>Edit</a>
-          <a href={BOARD_URL} className='audio-tools-link' target='_blank' rel='noopener noreferrer' onClick={() => setIsMobileMenuOpen(false)}>掲示板</a>
         </div>
         <button
           type='button'

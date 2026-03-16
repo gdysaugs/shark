@@ -32,7 +32,6 @@ type SoVitsPreset = {
 const API_ENDPOINT = '/api/lipsync'
 const OAUTH_REDIRECT_URL = getOAuthRedirectUrl()
 const SHOP_URL = 'https://gettoken.uk/purchage/'
-const BOARD_URL = 'https://civitai.uk/'
 const MAX_TEXT_LENGTH = 100
 const LIPSYNC_BASE_REQUIRED_TICKETS = 2
 const LIPSYNC_LONG_TEXT_REQUIRED_TICKETS = 3
@@ -1739,7 +1738,6 @@ export function LipSync() {
           <a href='/video?mode=edit' className='lipsync-link' onClick={() => setIsMobileMenuOpen(false)}>Edit</a>
           <a href='/lipsync' className='lipsync-link is-active' onClick={() => setIsMobileMenuOpen(false)}>LipSync</a>
           <a href={SHOP_URL} className='lipsync-link' target='_blank' rel='noopener noreferrer' onClick={() => setIsMobileMenuOpen(false)}>ショップ</a>
-          <a href={BOARD_URL} className='lipsync-link' target='_blank' rel='noopener noreferrer' onClick={() => setIsMobileMenuOpen(false)}>掲示板</a>
           <button type='button' className='lipsync-ghost' onClick={handleSignOut}>ログアウト</button>
         </div>
         <button

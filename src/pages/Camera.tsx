@@ -78,7 +78,6 @@ const PROMPT_PLACEHOLDER = '作りたい映像の指示を入力'
 const I2V_IMAGE_INPUT_ID = 'video-i2v-image-file'
 const COIN_PURCHASE_URL = 'https://checkoutcoins2.win/purchase.html'
 const SHOP_URL = 'https://gettoken.uk/purchage/'
-const BOARD_URL = 'https://civitai.uk/'
 const parseVideoModel = (value: string | null): VideoModel =>
   value && value.toLowerCase() in VIDEO_MODELS ? (value.toLowerCase() as VideoModel) : DEFAULT_VIDEO_MODEL
 
@@ -1165,15 +1164,6 @@ export function Camera() {
             onClick={() => setIsMobileMenuOpen(false)}
           >
             ショップ
-          </a>
-          <a
-            href={BOARD_URL}
-            className="fastmove-link"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            掲示板
           </a>
           <button type="button" className="fastmove-ghost" onClick={handleSignOut}>
             ログアウト

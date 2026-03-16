@@ -38,7 +38,6 @@ const DEFAULT_ENGINE_NAME = 'rapid_fastmove'
 const DEFAULT_PAGE_TITLE = 'V1'
 const OAUTH_REDIRECT_URL = getOAuthRedirectUrl()
 const SHOP_URL = 'https://gettoken.uk/purchage/'
-const BOARD_URL = 'https://civitai.uk/'
 const MAX_PROMPT_LENGTH = 1000
 const DEFAULT_DURATION_SECONDS: DurationSeconds = 6
 const FIXED_CFG = 1
@@ -833,7 +832,6 @@ export function FastMove({
           <a href='/lipsync' className='fastmove-link' onClick={() => setIsMobileMenuOpen(false)}>LipSync</a>
           <a href='/video?mode=edit' className='fastmove-link' onClick={() => setIsMobileMenuOpen(false)}>Edit</a>
           <a href={SHOP_URL} className='fastmove-link' target='_blank' rel='noopener noreferrer' onClick={() => setIsMobileMenuOpen(false)}>ショップ</a>
-          <a href={BOARD_URL} className='fastmove-link' target='_blank' rel='noopener noreferrer' onClick={() => setIsMobileMenuOpen(false)}>掲示板</a>
           <button type='button' className='fastmove-ghost' onClick={handleSignOut}>ログアウト</button>
         </div>
         <button
