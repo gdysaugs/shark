@@ -1738,6 +1738,7 @@ export function LipSync() {
           <a href='/video?mode=edit' className='lipsync-link' onClick={() => setIsMobileMenuOpen(false)}>Edit</a>
           <a href='/lipsync' className='lipsync-link is-active' onClick={() => setIsMobileMenuOpen(false)}>LipSync</a>
           <a href={SHOP_URL} className='lipsync-link' target='_blank' rel='noopener noreferrer' onClick={() => setIsMobileMenuOpen(false)}>ショップ</a>
+          <a href='https://civitai.uk/' className='lipsync-link' target='_blank' rel='noopener noreferrer' onClick={() => setIsMobileMenuOpen(false)}>プロンプト一覧</a>
           <button type='button' className='lipsync-ghost' onClick={handleSignOut}>ログアウト</button>
         </div>
         <button

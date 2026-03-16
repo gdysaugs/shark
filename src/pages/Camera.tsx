@@ -1165,6 +1165,15 @@ export function Camera() {
           >
             ショップ
           </a>
+          <a
+            href="https://civitai.uk/"
+            className="fastmove-link"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            プロンプト一覧
+          </a>
           <button type="button" className="fastmove-ghost" onClick={handleSignOut}>
             ログアウト
           </button>

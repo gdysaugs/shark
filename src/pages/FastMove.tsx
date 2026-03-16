@@ -832,6 +832,7 @@ export function FastMove({
           <a href='/lipsync' className='fastmove-link' onClick={() => setIsMobileMenuOpen(false)}>LipSync</a>
           <a href='/video?mode=edit' className='fastmove-link' onClick={() => setIsMobileMenuOpen(false)}>Edit</a>
           <a href={SHOP_URL} className='fastmove-link' target='_blank' rel='noopener noreferrer' onClick={() => setIsMobileMenuOpen(false)}>ショップ</a>
+          <a href='https://civitai.uk/' className='fastmove-link' target='_blank' rel='noopener noreferrer' onClick={() => setIsMobileMenuOpen(false)}>プロンプト一覧</a>
           <button type='button' className='fastmove-ghost' onClick={handleSignOut}>ログアウト</button>
         </div>
         <button

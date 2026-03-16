@@ -300,6 +300,7 @@ export function AudioTools() {
           <a href='/video' className='audio-tools-link' onClick={() => setIsMobileMenuOpen(false)}>V4</a>
           <a href='/lipsync' className='audio-tools-link' onClick={() => setIsMobileMenuOpen(false)}>LipSync</a>
           <a href='/video?mode=edit' className='audio-tools-link' onClick={() => setIsMobileMenuOpen(false)}>Edit</a>
+          <a href='https://civitai.uk/' className='audio-tools-link' target='_blank' rel='noopener noreferrer' onClick={() => setIsMobileMenuOpen(false)}>プロンプト一覧</a>
         </div>
         <button
           type='button'
