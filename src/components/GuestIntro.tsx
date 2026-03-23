@@ -6,37 +6,16 @@ type GuestIntroProps = {
 import './guest-intro.css'
 
 const HERO_BANNER_IMAGE = '/media/shark-hero-banner-20260314.png?v=20260314-2'
-const HERO_SUB_BANNER_IMAGE = '/media/hero-sub-banner-20260314.png?v=20260314-1'
+const HERO_BANNER_VIDEO = '/media/hero-banner-sharkai-video-2.mp4?v=20260323-1'
 const VIDEO_6S = '/media/landing-sample-6s.mp4?v=20260316-1'
 const VIDEO_8S = '/media/landing-sample-8s.mp4?v=20260314-1'
 const VIDEO_10S = '/media/landing-sample-10s-v2.mp4?v=20260315-1'
-const VIDEO_LIPSYNC_SAMPLE = '/media/landing-sample-lipsync-12.mp4?v=20260314-1'
-const VIDEO_LIPSYNC_SAMPLE_POSTER = '/media/landing-sample-lipsync-12.jpg?v=20260314-2'
-const LIPSYNC_HOWTO_SAMPLE = '/media/lipsync-howto-sample-11.mp4?v=20260314-1'
-const LIPSYNC_HOWTO_SAMPLE_POSTER = '/media/lipsync-howto-sample-11.jpg?v=20260314-1'
 const EDIT_CUCUMBER_SOURCE = '/media/edit-cucumber-source.avif?v=20260314-1'
 const EDIT_CUCUMBER_RESULT = '/media/edit-cucumber-result.png?v=20260314-1'
-const LIPSYNC_USER_SAMPLES = [
-  {
-    title: 'V1生成動画',
-    video: '/media/lipsync-result-17.mp4?v=20260314-1',
-    poster: '/media/lipsync-result-17.jpg?v=20260314-1',
-  },
-  {
-    title: 'V2生成動画',
-    video: '/media/lipsync-result-15.mp4?v=20260314-1',
-    poster: '/media/lipsync-result-15.jpg?v=20260314-1',
-  },
-  {
-    title: 'V3生成動画',
-    video: '/media/lipsync-result-13.mp4?v=20260314-1',
-    poster: '/media/lipsync-result-13.jpg?v=20260314-1',
-  },
-  {
-    title: 'V4生成動画',
-    video: '/media/lipsync-result-14.mp4?v=20260314-1',
-    poster: '/media/lipsync-result-14.jpg?v=20260314-1',
-  },
+const VIDEO_GENERATION_SAMPLES = [
+  { src: VIDEO_6S, label: '6秒' },
+  { src: VIDEO_8S, label: '8秒' },
+  { src: VIDEO_10S, label: '10秒' },
 ] as const
 
 export function GuestIntro({ mode, onSignIn }: GuestIntroProps) {
@@ -54,15 +33,24 @@ export function GuestIntro({ mode, onSignIn }: GuestIntroProps) {
 
       <section className='clean-hero'>
         <div className='clean-hero__intro'>
-          <h1>{isVideoMode ? 'このAI、史上最強。' : '2枚の画像で、高品質な編集結果を生成'}</h1>
+          <h1>{isVideoMode ? '画像→動画を一瞬で' : '2枚の画像で、高品質な編集結果を生成'}</h1>
           <div className='clean-hero__media-login'>
-            <div className='clean-hero__banner-wrap'>
-              <img className='clean-hero__sub-banner' src={HERO_SUB_BANNER_IMAGE} alt='SharkAI hero banner' loading='lazy' />
+            <div className='clean-hero__banner-wrap clean-hero__banner-wrap--single-video' aria-label='SharkAIバナー動画'>
+              <video
+                className='clean-hero__banner-video'
+                src={HERO_BANNER_VIDEO}
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload='metadata'
+              />
             </div>
             <div className='clean-hero__pitch'>
-              <p>最高峰の日本語リップシンク＆ボイスクローン</p>
+              <p>高品質な動画生成と画像編集を1つの画面で</p>
               <p>４種類の独自動画モデル</p>
-              <p>画像編集・動画生成どちらも対応</p>
+              <p>最大10秒の動画生成</p>
+              <p>無料登録で5回生成可能</p>
               <div className='clean-hero__cta'>
                 <button type='button' className='clean-btn clean-btn--primary clean-btn--hero' onClick={onSignIn}>
                   ログイン/無料登録
@@ -73,53 +61,20 @@ export function GuestIntro({ mode, onSignIn }: GuestIntroProps) {
         </div>
       </section>
 
-      <section className='clean-samples clean-samples--lipsync'>
-        <div className='clean-video-grid clean-video-grid--lipsync'>
-          {LIPSYNC_USER_SAMPLES.map((item) => (
-            <article className='clean-card' key={item.video}>
+      <section className='clean-samples clean-samples--video clean-generation-showcase'>
+        <header className='clean-section__head clean-section__head--tight'>
+          <h2>動画生成サンプル</h2>
+        </header>
+        <div className='clean-video-grid clean-video-grid--generation'>
+          {VIDEO_GENERATION_SAMPLES.map((sample) => (
+            <article key={sample.src} className='clean-card'>
               <header>
-                <strong>{item.title}</strong>
+                <strong>{sample.label}サンプル</strong>
+                <span>動画生成出力</span>
               </header>
-              <video src={item.video} poster={item.poster} controls playsInline preload='none' />
+              <video src={sample.src} autoPlay loop muted playsInline preload='metadata' />
             </article>
           ))}
-        </div>
-      </section>
-
-      <section className='clean-samples clean-samples--video'>
-        <header className='clean-section__head clean-section__head--tight'>
-          <h2>最大１０秒の動画生成</h2>
-          <p>１枚の画像からどんな動画も作れます。</p>
-        </header>
-        <div className='clean-video-grid clean-video-grid--hero'>
-          <article className='clean-card'>
-            <header>
-              <strong>6秒サンプル</strong>
-              <span>最速で短い動画を作成</span>
-            </header>
-            <video src={VIDEO_6S} autoPlay loop muted playsInline preload='auto' />
-          </article>
-          <article className='clean-card'>
-            <header>
-              <strong>8秒サンプル</strong>
-              <span>動きと安定感のバランス</span>
-            </header>
-            <video src={VIDEO_8S} autoPlay loop muted playsInline preload='auto' />
-          </article>
-          <article className='clean-card'>
-            <header>
-              <strong>10秒サンプル</strong>
-              <span>演出重視の長尺動画</span>
-            </header>
-            <video src={VIDEO_10S} autoPlay loop muted playsInline preload='auto' />
-          </article>
-          <article className='clean-card'>
-            <header>
-              <strong>リップシンクサンプル(音量注意)</strong>
-              <span>どんな動画にも好きなセリフを当てられます</span>
-            </header>
-            <video src={VIDEO_LIPSYNC_SAMPLE} poster={VIDEO_LIPSYNC_SAMPLE_POSTER} controls playsInline preload='none' />
-          </article>
         </div>
       </section>
 
@@ -154,7 +109,7 @@ export function GuestIntro({ mode, onSignIn }: GuestIntroProps) {
       <section className='clean-samples clean-feature-showcase'>
         <header className='clean-section__head clean-section__head--tight'>
           <h2>SharkAIの機能一覧</h2>
-          <p>動画と音声をまとめて扱える主要機能</p>
+          <p>動画と画像をまとめて扱える主要機能</p>
         </header>
         <div className='clean-feature-grid'>
           <article className='clean-feature-card'>
@@ -179,21 +134,21 @@ export function GuestIntro({ mode, onSignIn }: GuestIntroProps) {
 
           <article className='clean-feature-card'>
             <span className='clean-feature-icon' aria-hidden='true'>
-              🎤
+              🖼️
             </span>
             <div>
-              <strong>日本語ボイスクローン</strong>
-              <p>数秒の音声からコピーして、どんなセリフも自由に再現できる高精度クローン技術。</p>
+              <strong>画像編集モード</strong>
+              <p>画像1枚を必須に、追加画像も使いながらプロンプトで見た目を編集可能。</p>
             </div>
           </article>
 
           <article className='clean-feature-card'>
             <span className='clean-feature-icon' aria-hidden='true'>
-              🔊
+              ⚡
             </span>
             <div>
-              <strong>幅広い感情表現</strong>
-              <p>喘ぎ声や叫び声まで、ソース音声次第でどんな表現も可能。</p>
+              <strong>実運用向けワークフロー</strong>
+              <p>トークン管理、出力保存、日次ボーナスなどの運用機能を標準搭載。</p>
             </div>
           </article>
         </div>
@@ -205,46 +160,6 @@ export function GuestIntro({ mode, onSignIn }: GuestIntroProps) {
             無料登録で５トークンもらう
           </button>
         </div>
-      </section>
-
-      <section className='clean-samples clean-lipsync-howto'>
-        <header className='clean-section__head clean-section__head--tight'>
-          <h2>リップシンクの使い方</h2>
-          <p>4ステップで、人物動画に好きな声とセリフを当てられます。</p>
-        </header>
-
-        <ol className='clean-howto-steps'>
-          <li className='clean-howto-step'>
-            <span className='clean-howto-step__num'>1</span>
-            <p>🎬 まず人物の映ってる動画を用意</p>
-          </li>
-          <li className='clean-howto-step'>
-            <span className='clean-howto-step__num'>2</span>
-            <p>🎤 ボイスクローンしたい音声または動画ファイルを用意（3〜10秒）</p>
-          </li>
-          <li className='clean-howto-step'>
-            <span className='clean-howto-step__num'>3</span>
-            <p>📝 セリフを入力</p>
-          </li>
-          <li className='clean-howto-step'>
-            <span className='clean-howto-step__num'>4</span>
-            <p>🗣️ 動画の人物がソースの声音でセリフをしゃべる！</p>
-          </li>
-        </ol>
-
-        <article className='clean-card clean-howto-sample-card'>
-          <header>
-            <strong>リップシンク生成サンプル</strong>
-            <span>実際の出力例</span>
-          </header>
-          <video
-            src={LIPSYNC_HOWTO_SAMPLE}
-            poster={LIPSYNC_HOWTO_SAMPLE_POSTER}
-            controls
-            playsInline
-            preload='none'
-          />
-        </article>
       </section>
 
       <section className='clean-samples clean-terms-block'>

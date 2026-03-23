@@ -707,7 +707,7 @@ export function Camera() {
 
   const pollJob = useCallback(async (jobId: string, runId: number, token?: string, model: VideoModel = DEFAULT_VIDEO_MODEL) => {
     const config = VIDEO_MODELS[model] ?? VIDEO_MODELS[DEFAULT_VIDEO_MODEL]
-    for (let i = 0; i < 180; i += 1) {
+    while (true) {
       if (runIdRef.current !== runId) return { status: 'cancelled' as const, videos: [] }
       const headers: Record<string, string> = {}
       if (token) {
@@ -758,7 +758,6 @@ export function Camera() {
       }
       await wait(1000)
     }
-    throw new Error('生成がタイムアウトしました。')
   }, [])
 
   const ensureTicketsForGeneration = useCallback(async () => {
@@ -907,20 +906,9 @@ export function Camera() {
     window.alert('ログインURLの取得に失敗しました。')
   }
 
-  const handleOpenFastMove = useCallback(() => {
-    setIsMobileMenuOpen(false)
-    setGenerationMode('i2v')
-    setVideoModel('v1')
-  }, [])
-
   const handleOpenVideo = useCallback(() => {
     setIsMobileMenuOpen(false)
     setGenerationMode('i2v')
-  }, [])
-
-  const handleOpenLipSync = useCallback(() => {
-    setIsMobileMenuOpen(false)
-    window.location.assign('/lipsync')
   }, [])
 
   const handleSignOut = async () => {
@@ -1148,14 +1136,6 @@ export function Camera() {
           >
             画像編集
           </button>
-          <button
-            type="button"
-            className="fastmove-link"
-            onClick={handleOpenLipSync}
-            disabled={disableModeSwitch}
-          >
-            リップシンク
-          </button>
           <a
             href={SHOP_URL}
             className="fastmove-link"
@@ -1164,15 +1144,6 @@ export function Camera() {
             onClick={() => setIsMobileMenuOpen(false)}
           >
             ショップ
-          </a>
-          <a
-            href="https://civitai.uk/"
-            className="fastmove-link"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            プロンプト一覧
           </a>
           <button type="button" className="fastmove-ghost" onClick={handleSignOut}>
             ログアウト
@@ -1424,8 +1395,6 @@ export function Camera() {
             onEnsureTickets={ensureTicketsForGeneration}
             onTicketShortage={() => setShowTicketModal(true)}
             onTicketCountUpdate={(nextCount) => setTicketCount(nextCount)}
-            onOpenFastMove={handleOpenFastMove}
-            onOpenLipSync={handleOpenLipSync}
           />
         </div>
       )}

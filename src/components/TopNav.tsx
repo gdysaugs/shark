@@ -41,14 +41,6 @@ export function TopNav() {
         >
           ショップ
         </a>
-        <a
-          href='https://civitai.uk/'
-          className='top-nav__link'
-          target='_blank'
-          rel='noopener noreferrer'
-        >
-          プロンプト一覧
-        </a>
       </nav>
     </header>
   )

@@ -36,16 +36,6 @@ const INTERNAL_ERROR_MESSAGE = 'エラーです。やり直してください。
 const internalErrorResponse = (corsHeaders: HeadersInit) =>
   jsonResponse({ error: INTERNAL_ERROR_MESSAGE }, 500, corsHeaders)
 
-const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs: number) => {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    return await fetch(url, { ...init, signal: controller.signal })
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
 const resolveEndpoint = (env: Env) =>
   (env.RUNPOD_WAN_REMIX_ENDPOINT_URL ?? env.RUNPOD_WAN_ENDPOINT_URL ?? env.RUNPOD_ENDPOINT_URL)?.replace(/\/$/, '')
 
@@ -738,16 +728,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   let upstream: Response
   try {
-    upstream = await fetchWithTimeout(
-      endpoint + '/status/' + encodeURIComponent(id),
-      { headers: { Authorization: 'Bearer ' + env.RUNPOD_API_KEY } },
-      15000,
-    )
-  } catch (error) {
-    const isTimeout = error instanceof Error && error.name === 'AbortError'
-    if (isTimeout) {
-      return jsonResponse({ id, status: 'IN_PROGRESS', state: 'IN_PROGRESS' }, 200, corsHeaders)
-    }
+    upstream = await fetch(endpoint + '/status/' + encodeURIComponent(id), {
+      headers: { Authorization: 'Bearer ' + env.RUNPOD_API_KEY },
+    })
+  } catch {
     return jsonResponse({ error: 'RunPod status check failed.' }, 502, corsHeaders)
   }
   const raw = await upstream.text()

@@ -4,11 +4,6 @@ import {
   onRequestPost as qwenEditPost,
   onRequestOptions as qwenEditOptions,
 } from '../functions/api/qwen_edit'
-import {
-  onRequestGet as lipsyncGet,
-  onRequestPost as lipsyncPost,
-  onRequestOptions as lipsyncOptions,
-} from '../functions/api/lipsync'
 import { onRequestGet as wanGet, onRequestPost as wanPost, onRequestOptions as wanOptions } from '../functions/api/wan'
 import { onRequestGet as wanRemixGet, onRequestPost as wanRemixPost, onRequestOptions as wanRemixOptions } from '../functions/api/wan_remix'
 import { onRequestGet as wanRapidGet, onRequestPost as wanRapidPost, onRequestOptions as wanRapidOptions } from '../functions/api/wan-rapid'
@@ -94,13 +89,6 @@ export default {
       if (method === 'OPTIONS') return qwenOptions(args as any)
       if (method === 'GET') return qwenGet(args as any)
       if (method === 'POST') return qwenPost(args as any)
-      return methodNotAllowed()
-    }
-
-    if (path.startsWith('/api/lipsync')) {
-      if (method === 'OPTIONS') return lipsyncOptions(args as any)
-      if (method === 'GET') return lipsyncGet(args as any)
-      if (method === 'POST') return lipsyncPost(args as any)
       return methodNotAllowed()
     }
 

@@ -574,7 +574,7 @@ export function FastMove({
   }, [apiEndpoint, durationSeconds, engineName, negativePrompt, prompt, selectedQuality.fps, sourceImageFile])
 
   const pollJob = useCallback(async (jobId: string, token: string, runId: number): Promise<PollResult> => {
-    for (let i = 0; i < 180; i += 1) {
+    while (true) {
       if (runIdRef.current !== runId) {
         return { status: 'cancelled', videos: [] }
       }
@@ -618,8 +618,6 @@ export function FastMove({
 
       await wait(1000)
     }
-
-    throw new Error('生成がタイムアウトしました。')
   }, [apiEndpoint, engineName])
 
   const handleGenerate = useCallback(async () => {
@@ -829,10 +827,8 @@ export function FastMove({
           <a href='/smoothmix' className={`fastmove-link${activeNav === 'smoothmix' ? ' is-active' : ''}`} onClick={() => setIsMobileMenuOpen(false)}>V2</a>
           <a href='/video-remix' className='fastmove-link' onClick={() => setIsMobileMenuOpen(false)}>V3</a>
           <a href='/video' className='fastmove-link' onClick={() => setIsMobileMenuOpen(false)}>V4</a>
-          <a href='/lipsync' className='fastmove-link' onClick={() => setIsMobileMenuOpen(false)}>LipSync</a>
           <a href='/video?mode=edit' className='fastmove-link' onClick={() => setIsMobileMenuOpen(false)}>Edit</a>
           <a href={SHOP_URL} className='fastmove-link' target='_blank' rel='noopener noreferrer' onClick={() => setIsMobileMenuOpen(false)}>ショップ</a>
-          <a href='https://civitai.uk/' className='fastmove-link' target='_blank' rel='noopener noreferrer' onClick={() => setIsMobileMenuOpen(false)}>プロンプト一覧</a>
           <button type='button' className='fastmove-ghost' onClick={handleSignOut}>ログアウト</button>
         </div>
         <button

@@ -17,8 +17,6 @@ type GenerationMode = 'i2v' | 'qwen_edit'
 type QwenEditPanelProps = {
   generationMode: GenerationMode
   onChangeMode: (mode: GenerationMode) => void
-  onOpenFastMove: () => void
-  onOpenLipSync: () => void
   accessToken: string
   selectedTicketCost: number
   ticketStatus: 'idle' | 'loading' | 'error'
@@ -265,8 +263,6 @@ const dataUrlToBlob = (dataUrl: string, fallbackMime: string) => {
 export function QwenEditPanel({
   generationMode,
   onChangeMode,
-  onOpenFastMove,
-  onOpenLipSync,
   accessToken,
   selectedTicketCost,
   ticketStatus,
@@ -369,8 +365,9 @@ export function QwenEditPanel({
   }
 
   const pollJob = async (jobId: string, usageId: string) => {
-    for (let i = 0; i < 180; i += 1) {
-      setStatus(`Polling (${i + 1}/180)...`)
+    let attempt = 0
+    while (true) {
+      setStatus(`Polling (${attempt + 1})...`)
       const headers: Record<string, string> = {}
       if (accessToken) {
         headers.Authorization = `Bearer ${accessToken}`
@@ -409,8 +406,8 @@ export function QwenEditPanel({
       if (images.length) return images[0]
 
       await wait(2000)
+      attempt += 1
     }
-    throw new Error('Timed out while waiting for image generation.')
   }
 
   const handleGenerate = async () => {

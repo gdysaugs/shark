@@ -405,7 +405,8 @@ export function Image() {
   )
 
   const pollJob = useCallback(async (jobId: string, usageId: string, runId: number, token?: string) => {
-    for (let i = 0; i < 180; i += 1) {
+    let attempt = 0
+    while (true) {
       if (runIdRef.current !== runId) return { status: 'cancelled' as const, images: [] as string[] }
       const headers: Record<string, string> = {}
       if (token) headers.Authorization = `Bearer ${token}`
@@ -434,9 +435,9 @@ export function Image() {
       }
       const images = extractImageList(data)
       if (images.length) return { status: 'done' as const, images }
-      await wait(2000 + i * 50)
+      await wait(Math.min(2000 + attempt * 50, 8000))
+      attempt += 1
     }
-    throw new Error('生成がタイムアウトしました。')
   }, [])
 
   const startGenerate = useCallback(
